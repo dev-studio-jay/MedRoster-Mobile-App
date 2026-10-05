@@ -1,5 +1,7 @@
 # MedRoster — Mobile App
 
+**Blaze Studios** · `com.blazestudios.medroster`
+
 Flutter client for MedRoster — hospital workforce management for Ghana Health Service facilities.
 
 Signs in with **Firebase Auth** and talks to the [MedRoster API](https://github.com/blaze308/medroster-backend) for hospitals, departments, staff, and schedules.
@@ -82,7 +84,22 @@ lib/
 
 ---
 
-## Related repos
+## Release build (Play Store)
+
+Solo dev workflow — no CI. From `app/`:
+
+```powershell
+flutter pub get
+flutter build appbundle --release
+```
+
+Upload `build/app/outputs/bundle/release/app-release.aab` in Play Console.
+
+## TODO
+
+- [ ] **Shorebird** — OTA patches without a full store release each time ([shorebird.dev](https://shorebird.dev))
+
+---
 
 | Repo | Role |
 |------|------|

@@ -18,6 +18,8 @@ class _SchedulesScreenState extends State<SchedulesScreen> {
   String? _hospitalId;
   bool _loading = true;
   String? _error;
+  bool _canWrite = false;
+  bool _hasHospital = true;
 
   final _dateFmt = DateFormat('dd MMM yyyy');
 
@@ -30,8 +32,27 @@ class _SchedulesScreenState extends State<SchedulesScreen> {
   Future<void> _load() async {
     setState(() { _loading = true; _error = null; });
     try {
+      await ApiService.instance.loadProfile();
+      _canWrite = ApiService.instance.canWrite;
+      _hasHospital = ApiService.instance.hasHospital;
+      if (!_hasHospital) {
+        setState(() {
+          _schedules = [];
+          _departments = [];
+          _wards = [];
+        });
+        return;
+      }
       final hospitals = await ApiService.instance.get('/api/hospitals') as List;
-      if (hospitals.isEmpty) throw Exception('No hospital found');
+      if (hospitals.isEmpty) {
+        _hasHospital = false;
+        setState(() {
+          _schedules = [];
+          _departments = [];
+          _wards = [];
+        });
+        return;
+      }
       _hospitalId = hospitals.first['_id'] as String;
       final results = await Future.wait([
         ApiService.instance.get('/api/hospitals/$_hospitalId/schedules'),
@@ -196,17 +217,26 @@ class _SchedulesScreenState extends State<SchedulesScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Schedules')),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _showCreateDialog,
-        icon: const Icon(Icons.add),
-        label: const Text('New Schedule'),
-      ),
+      floatingActionButton: (_canWrite && _hasHospital)
+          ? FloatingActionButton.extended(
+              onPressed: _showCreateDialog,
+              icon: const Icon(Icons.add),
+              label: const Text('New Schedule'),
+            )
+          : null,
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
               ? ErrorView(message: _error!, onRetry: _load)
-              : _schedules.isEmpty
-                  ? EmptyState(icon: Icons.calendar_month_outlined, message: 'No schedules yet.\nTap + to create one.', onAction: _showCreateDialog, actionLabel: 'New Schedule')
+              : !_hasHospital
+                  ? const EmptyState(icon: Icons.local_hospital_outlined, message: ApiService.individualAppMessage)
+                  : _schedules.isEmpty
+                  ? EmptyState(
+                      icon: Icons.calendar_month_outlined,
+                      message: _canWrite ? 'No schedules yet.\nTap + to create one.' : 'No schedules yet.',
+                      onAction: _canWrite ? _showCreateDialog : null,
+                      actionLabel: _canWrite ? 'New Schedule' : null,
+                    )
                   : RefreshIndicator(
                       onRefresh: _load,
                       child: ListView.separated(
@@ -245,10 +275,12 @@ class _SchedulesScreenState extends State<SchedulesScreen> {
                                   child: Text(status.toUpperCase(), style: TextStyle(fontSize: 10, color: _statusColor(status), fontWeight: FontWeight.bold)),
                                 ),
                               ]),
-                              trailing: IconButton(
-                                icon: const Icon(Icons.delete_outline, color: Colors.red),
-                                onPressed: () => _delete(s['_id'] as String, s['name'] as String? ?? ''),
-                              ),
+                              trailing: _canWrite
+                                  ? IconButton(
+                                      icon: const Icon(Icons.delete_outline, color: Colors.red),
+                                      onPressed: () => _delete(s['_id'] as String, s['name'] as String? ?? ''),
+                                    )
+                                  : null,
                             ),
                           );
                         },

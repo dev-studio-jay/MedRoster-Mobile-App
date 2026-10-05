@@ -15,6 +15,8 @@ class _DepartmentsScreenState extends State<DepartmentsScreen> {
   String? _hospitalId;
   bool _loading = true;
   String? _error;
+  bool _canWrite = false;
+  bool _hasHospital = true;
 
   @override
   void initState() {
@@ -25,8 +27,19 @@ class _DepartmentsScreenState extends State<DepartmentsScreen> {
   Future<void> _load() async {
     setState(() { _loading = true; _error = null; });
     try {
+      await ApiService.instance.loadProfile();
+      _canWrite = ApiService.instance.canWrite;
+      _hasHospital = ApiService.instance.hasHospital;
+      if (!_hasHospital) {
+        setState(() => _depts = []);
+        return;
+      }
       final hospitals = await ApiService.instance.get('/api/hospitals') as List;
-      if (hospitals.isEmpty) throw Exception('No hospital found');
+      if (hospitals.isEmpty) {
+        _hasHospital = false;
+        setState(() => _depts = []);
+        return;
+      }
       _hospitalId = hospitals.first['_id'] as String;
       final depts = await ApiService.instance.get('/api/hospitals/$_hospitalId/departments') as List;
       setState(() => _depts = depts.cast<Map<String, dynamic>>());
@@ -104,17 +117,26 @@ class _DepartmentsScreenState extends State<DepartmentsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Departments')),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _showAddDialog,
-        icon: const Icon(Icons.add),
-        label: const Text('Add'),
-      ),
+      floatingActionButton: (_canWrite && _hasHospital)
+          ? FloatingActionButton.extended(
+              onPressed: _showAddDialog,
+              icon: const Icon(Icons.add),
+              label: const Text('Add'),
+            )
+          : null,
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
               ? ErrorView(message: _error!, onRetry: _load)
-              : _depts.isEmpty
-                  ? EmptyState(icon: Icons.account_tree_outlined, message: 'No departments yet.\nTap + to add one.', onAction: _showAddDialog, actionLabel: 'Add Department')
+              : !_hasHospital
+                  ? const EmptyState(icon: Icons.local_hospital_outlined, message: ApiService.individualAppMessage)
+                  : _depts.isEmpty
+                  ? EmptyState(
+                      icon: Icons.account_tree_outlined,
+                      message: _canWrite ? 'No departments yet.\nTap + to add one.' : 'No departments yet.',
+                      onAction: _canWrite ? _showAddDialog : null,
+                      actionLabel: _canWrite ? 'Add Department' : null,
+                    )
                   : RefreshIndicator(
                       onRefresh: _load,
                       child: ListView.separated(
@@ -139,10 +161,12 @@ class _DepartmentsScreenState extends State<DepartmentsScreen> {
                               subtitle: d['description'] != null && (d['description'] as String).isNotEmpty
                                   ? Text(d['description'])
                                   : null,
-                              trailing: IconButton(
-                                icon: const Icon(Icons.delete_outline, color: Colors.red),
-                                onPressed: () => _delete(d['_id'] as String, d['name'] as String),
-                              ),
+                              trailing: _canWrite
+                                  ? IconButton(
+                                      icon: const Icon(Icons.delete_outline, color: Colors.red),
+                                      onPressed: () => _delete(d['_id'] as String, d['name'] as String),
+                                    )
+                                  : null,
                             ),
                           );
                         },

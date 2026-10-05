@@ -24,15 +24,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Future<void> _load() async {
     setState(() { _loading = true; _error = null; });
     try {
-      // Get hospitalId from the backend user record
       final uid = AuthService.instance.currentUser?.uid;
       if (uid == null) throw Exception('Not authenticated');
 
-      // Fetch all hospitals the user belongs to (backend returns only theirs)
+      await ApiService.instance.loadProfile();
+      if (!ApiService.instance.hasHospital) {
+        setState(() => _hospital = null);
+        return;
+      }
+
       final data = await ApiService.instance.get('/api/hospitals');
       final list = (data as List);
       if (list.isNotEmpty) {
         setState(() => _hospital = list.first as Map<String, dynamic>);
+      } else {
+        setState(() => _hospital = null);
       }
     } on ApiException catch (e) {
       setState(() => _error = e.message);
@@ -44,6 +50,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _signOut() async {
+    ApiService.instance.clearProfile();
     await AuthService.instance.signOut();
     if (mounted) context.go('/auth/login');
   }
@@ -78,7 +85,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Widget _buildBody(ThemeData theme) {
     final h = _hospital;
-    if (h == null) return const Center(child: Text('No hospital found.'));
+    if (h == null) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(32),
+          child: Text(
+            ApiService.individualAppMessage,
+            textAlign: TextAlign.center,
+          ),
+        ),
+      );
+    }
 
     return RefreshIndicator(
       onRefresh: _load,
@@ -100,7 +117,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
               _QuickCard(icon: Icons.account_tree, label: 'Departments', color: Colors.blue, onTap: () => context.go('/departments')),
               _QuickCard(icon: Icons.people, label: 'Staff', color: Colors.green, onTap: () => context.go('/staff')),
               _QuickCard(icon: Icons.calendar_month, label: 'Schedules', color: Colors.orange, onTap: () => context.go('/schedules')),
-              _QuickCard(icon: Icons.bar_chart, label: 'Reports', color: Colors.purple, onTap: () {}),
             ],
           ),
         ],

@@ -3,6 +3,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:go_router/go_router.dart';
 import 'firebase_options.dart';
 import 'services/auth_service.dart';
+import 'services/api_service.dart';
 import 'screens/login_screen.dart';
 import 'screens/register_screen.dart';
 import 'screens/dashboard_screen.dart';
@@ -17,10 +18,14 @@ void main() async {
 }
 
 final _router = GoRouter(
+  refreshListenable: AuthService.instance.authListenable,
   redirect: (context, state) {
     final loggedIn = AuthService.instance.currentUser != null;
     final onAuth = state.matchedLocation.startsWith('/auth');
-    if (!loggedIn && !onAuth) return '/auth/login';
+    if (!loggedIn && !onAuth) {
+      ApiService.instance.clearProfile();
+      return '/auth/login';
+    }
     if (loggedIn && onAuth) return '/';
     return null;
   },

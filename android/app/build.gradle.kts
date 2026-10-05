@@ -1,3 +1,6 @@
+import java.io.FileInputStream
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("kotlin-android")
@@ -7,7 +10,7 @@ plugins {
 }
 
 android {
-    namespace = "com.medroster.medroster"
+    namespace = "com.blazestudios.medroster"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -20,15 +23,14 @@ android {
         jvmTarget = JavaVersion.VERSION_11.toString()
     }
 
-    // Load signing config from key.properties
-    def keystoreProperties = new Properties()
-    def keystorePropertiesFile = rootProject.file('key.properties')
+    val keystorePropertiesFile = rootProject.file("key.properties")
+    val keystoreProperties = Properties()
     if (keystorePropertiesFile.exists()) {
-        keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+        keystoreProperties.load(FileInputStream(keystorePropertiesFile))
     }
 
     defaultConfig {
-        applicationId = "com.medroster.medroster"
+        applicationId = "com.blazestudios.medroster"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
@@ -36,21 +38,25 @@ android {
     }
 
     signingConfigs {
-        release {
+        create("release") {
             if (keystorePropertiesFile.exists()) {
-                keyAlias keystoreProperties['keyAlias']
-                keyPassword keystoreProperties['keyPassword']
-                storeFile file(keystoreProperties['storeFile'])
-                storePassword keystoreProperties['storePassword']
+                keyAlias = keystoreProperties["keyAlias"] as String
+                keyPassword = keystoreProperties["keyPassword"] as String
+                storeFile = file(keystoreProperties["storeFile"] as String)
+                storePassword = keystoreProperties["storePassword"] as String
             }
         }
     }
 
     buildTypes {
         release {
-            signingConfig = keystorePropertiesFile.exists() ? signingConfigs.release : signingConfigs.debug
-            minifyEnabled false
-            shrinkResources false
+            signingConfig = if (keystorePropertiesFile.exists()) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
+            isMinifyEnabled = false
+            isShrinkResources = false
         }
     }
 }

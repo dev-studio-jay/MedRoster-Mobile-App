@@ -1,4 +1,4 @@
-package com.medroster.medroster
+package com.blazestudios.medroster
 
 import io.flutter.embedding.android.FlutterActivity
 

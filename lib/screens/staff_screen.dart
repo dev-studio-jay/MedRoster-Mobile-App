@@ -17,6 +17,8 @@ class _StaffScreenState extends State<StaffScreen> {
   bool _loading = true;
   String? _error;
   String _search = '';
+  bool _canWrite = false;
+  bool _hasHospital = true;
 
   @override
   void initState() {
@@ -27,8 +29,25 @@ class _StaffScreenState extends State<StaffScreen> {
   Future<void> _load() async {
     setState(() { _loading = true; _error = null; });
     try {
+      await ApiService.instance.loadProfile();
+      _canWrite = ApiService.instance.canWrite;
+      _hasHospital = ApiService.instance.hasHospital;
+      if (!_hasHospital) {
+        setState(() {
+          _staff = [];
+          _departments = [];
+        });
+        return;
+      }
       final hospitals = await ApiService.instance.get('/api/hospitals') as List;
-      if (hospitals.isEmpty) throw Exception('No hospital found');
+      if (hospitals.isEmpty) {
+        _hasHospital = false;
+        setState(() {
+          _staff = [];
+          _departments = [];
+        });
+        return;
+      }
       _hospitalId = hospitals.first['_id'] as String;
       final results = await Future.wait([
         ApiService.instance.get('/api/hospitals/$_hospitalId/staff'),
@@ -186,17 +205,26 @@ class _StaffScreenState extends State<StaffScreen> {
           ),
         ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _showAddDialog,
-        icon: const Icon(Icons.person_add),
-        label: const Text('Add Staff'),
-      ),
+      floatingActionButton: (_canWrite && _hasHospital)
+          ? FloatingActionButton.extended(
+              onPressed: _showAddDialog,
+              icon: const Icon(Icons.person_add),
+              label: const Text('Add Staff'),
+            )
+          : null,
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
               ? ErrorView(message: _error!, onRetry: _load)
-              : filtered.isEmpty
-                  ? EmptyState(icon: Icons.people_outline, message: _search.isEmpty ? 'No staff yet.\nTap + to add.' : 'No results for "$_search"')
+              : !_hasHospital
+                  ? const EmptyState(icon: Icons.local_hospital_outlined, message: ApiService.individualAppMessage)
+                  : filtered.isEmpty
+                  ? EmptyState(
+                      icon: Icons.people_outline,
+                      message: _search.isEmpty
+                          ? (_canWrite ? 'No staff yet.\nTap + to add.' : 'No staff yet.')
+                          : 'No results for "$_search"',
+                    )
                   : RefreshIndicator(
                       onRefresh: _load,
                       child: ListView.separated(
@@ -225,10 +253,12 @@ class _StaffScreenState extends State<StaffScreen> {
                               ),
                               title: Text(name, style: const TextStyle(fontWeight: FontWeight.w600)),
                               subtitle: Text(dept.isNotEmpty ? '$rank · $dept' : rank, style: TextStyle(color: Colors.grey[600], fontSize: 13)),
-                              trailing: IconButton(
-                                icon: const Icon(Icons.delete_outline, color: Colors.red),
-                                onPressed: () => _delete(s['_id'] as String, name),
-                              ),
+                              trailing: _canWrite
+                                  ? IconButton(
+                                      icon: const Icon(Icons.delete_outline, color: Colors.red),
+                                      onPressed: () => _delete(s['_id'] as String, name),
+                                    )
+                                  : null,
                             ),
                           );
                         },

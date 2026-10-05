@@ -19,7 +19,7 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyBtA67XgypCa-L6A1S76Y3-OoRhVUMr7tA',
-    appId: '1:273151927050:android:b4b340fef2344d11ed10f3',
+    appId: '1:273151927050:android:51f15edeb7b14a87ed10f3',
     messagingSenderId: '273151927050',
     projectId: 'dev-studio-jay',
     storageBucket: 'dev-studio-jay.firebasestorage.app',
@@ -27,11 +27,12 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyCuDOZuWupCLFPlOUjqsy2XhMJpjeL8qRc',
-    appId: '1:273151927050:ios:0a9fd740d38db42fed10f3',
+    appId: '1:273151927050:ios:0a4de7e8bc3ae1e2ed10f3',
     messagingSenderId: '273151927050',
     projectId: 'dev-studio-jay',
     storageBucket: 'dev-studio-jay.firebasestorage.app',
-    iosBundleId: 'com.medroster.medroster',
+    iosClientId: '273151927050-8qgvdktcic8hsccfcus07u4a9tiutc3v.apps.googleusercontent.com',
+    iosBundleId: 'com.blazestudios.medroster',
   );
 
   static const FirebaseOptions web = FirebaseOptions(
