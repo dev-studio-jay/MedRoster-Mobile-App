@@ -4,12 +4,16 @@ import 'package:go_router/go_router.dart';
 import 'firebase_options.dart';
 import 'services/auth_service.dart';
 import 'services/api_service.dart';
+import 'state/hospital_store.dart';
 import 'screens/login_screen.dart';
 import 'screens/register_screen.dart';
-import 'screens/dashboard_screen.dart';
-import 'screens/departments_screen.dart';
-import 'screens/staff_screen.dart';
-import 'screens/schedules_screen.dart';
+import 'screens/hospital_shell.dart';
+import 'screens/ward_home_screen.dart';
+import 'screens/wards_screen.dart';
+import 'screens/settings_screen.dart';
+import 'screens/setup_screen.dart';
+import 'screens/schedule_screen.dart';
+import 'screens/import_roster_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -24,6 +28,9 @@ final _router = GoRouter(
     final onAuth = state.matchedLocation.startsWith('/auth');
     if (!loggedIn && !onAuth) {
       ApiService.instance.clearProfile();
+      HospitalStore.instance.hospital = null;
+      HospitalStore.instance.error = null;
+      HospitalStore.instance.loading = false;
       return '/auth/login';
     }
     if (loggedIn && onAuth) return '/';
@@ -32,13 +39,25 @@ final _router = GoRouter(
   routes: [
     GoRoute(path: '/auth/login', builder: (_, __) => const LoginScreen()),
     GoRoute(path: '/auth/register', builder: (_, __) => const RegisterScreen()),
+    GoRoute(
+      path: '/schedule/:schedId',
+      builder: (_, state) => ScheduleScreen(scheduleId: state.pathParameters['schedId']!),
+    ),
+    GoRoute(
+      path: '/import/:wardId',
+      builder: (_, state) => ImportRosterScreen(wardId: state.pathParameters['wardId']!),
+    ),
     ShellRoute(
-      builder: (context, state, child) => AppShell(child: child),
+      builder: (context, state, child) => HospitalShell(child: child),
       routes: [
-        GoRoute(path: '/', builder: (_, __) => const DashboardScreen()),
-        GoRoute(path: '/departments', builder: (_, __) => const DepartmentsScreen()),
-        GoRoute(path: '/staff', builder: (_, __) => const StaffScreen()),
-        GoRoute(path: '/schedules', builder: (_, __) => const SchedulesScreen()),
+        GoRoute(path: '/', builder: (_, __) => const Center(child: CircularProgressIndicator())),
+        GoRoute(path: '/setup', builder: (_, __) => const SetupScreen()),
+        GoRoute(path: '/wards', builder: (_, __) => const WardsScreen()),
+        GoRoute(path: '/settings', builder: (_, __) => const SettingsScreen()),
+        GoRoute(
+          path: '/ward/:wardId',
+          builder: (_, state) => WardHomeScreen(wardId: state.pathParameters['wardId']!),
+        ),
       ],
     ),
   ],
@@ -73,9 +92,6 @@ class MedRosterApp extends StatelessWidget {
         foregroundColor: Colors.white,
         elevation: 0,
       ),
-      navigationDrawerTheme: const NavigationDrawerThemeData(
-        indicatorColor: Color(0xFFE8F5EE),
-      ),
       inputDecorationTheme: InputDecorationTheme(
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -84,45 +100,10 @@ class MedRosterApp extends StatelessWidget {
         style: FilledButton.styleFrom(
           backgroundColor: ghsGreen,
           foregroundColor: Colors.white,
-          minimumSize: const Size(double.infinity, 50),
+          minimumSize: const Size(64, 48),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         ),
       ),
     );
-  }
-}
-
-class AppShell extends StatelessWidget {
-  final Widget child;
-  const AppShell({super.key, required this.child});
-
-  @override
-  Widget build(BuildContext context) {
-    final location = GoRouterState.of(context).matchedLocation;
-    return Scaffold(
-      body: child,
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _indexFor(location),
-        onDestinationSelected: (i) => _navigate(context, i),
-        destinations: const [
-          NavigationDestination(icon: Icon(Icons.dashboard_outlined), selectedIcon: Icon(Icons.dashboard), label: 'Dashboard'),
-          NavigationDestination(icon: Icon(Icons.account_tree_outlined), selectedIcon: Icon(Icons.account_tree), label: 'Departments'),
-          NavigationDestination(icon: Icon(Icons.people_outline), selectedIcon: Icon(Icons.people), label: 'Staff'),
-          NavigationDestination(icon: Icon(Icons.calendar_month_outlined), selectedIcon: Icon(Icons.calendar_month), label: 'Schedules'),
-        ],
-      ),
-    );
-  }
-
-  int _indexFor(String location) {
-    if (location.startsWith('/departments')) return 1;
-    if (location.startsWith('/staff')) return 2;
-    if (location.startsWith('/schedules')) return 3;
-    return 0;
-  }
-
-  void _navigate(BuildContext context, int index) {
-    const paths = ['/', '/departments', '/staff', '/schedules'];
-    context.go(paths[index]);
   }
 }

@@ -4,7 +4,7 @@
 
 Flutter client for MedRoster — hospital workforce management for Ghana Health Service facilities.
 
-Signs in with **Firebase Auth** and talks to the [MedRoster API](https://github.com/blaze308/medroster-backend) for hospitals, departments, staff, and schedules.
+Signs in with **Firebase Auth** and talks to the MedRoster API for hospitals, wards, staff, import, and schedules.
 
 ---
 
@@ -52,10 +52,13 @@ Signs in with **Firebase Auth** and talks to the [MedRoster API](https://github.
 |-------|--------|
 | `/auth/login` | Sign in |
 | `/auth/register` | Register admin + hospital |
-| `/` | Dashboard |
-| `/departments` | Departments |
-| `/staff` | Staff directory |
-| `/schedules` | Schedules list |
+| `/` | Hospital shell (redirects to a ward) |
+| `/ward/:wardId` | Ward home |
+| `/import/:wardId` | Import roster |
+| `/schedule/:schedId` | Roster calendar |
+| `/wards` | Add / edit wards |
+| `/settings` | Join code |
+| `/setup` | First department + ward |
 
 Unauthenticated users are redirected to login.
 
@@ -68,15 +71,24 @@ lib/
 ├── main.dart
 ├── firebase_options.dart
 ├── services/
-│   ├── auth_service.dart     # Firebase Auth
-│   └── api_service.dart      # Bearer-token HTTP client
+│   ├── auth_service.dart
+│   └── api_service.dart
+├── state/
+│   └── hospital_store.dart
+├── util/
+│   ├── dates.dart
+│   └── org_units.dart
 ├── screens/
 │   ├── login_screen.dart
 │   ├── register_screen.dart
-│   ├── dashboard_screen.dart
-│   ├── departments_screen.dart
-│   ├── staff_screen.dart
-│   └── schedules_screen.dart
+│   ├── hospital_shell.dart
+│   ├── ward_home_screen.dart
+│   ├── import_roster_screen.dart
+│   ├── schedule_screen.dart
+│   ├── staff_form_screen.dart
+│   ├── wards_screen.dart
+│   ├── settings_screen.dart
+│   └── setup_screen.dart
 └── widgets/
     ├── empty_state.dart
     └── error_view.dart

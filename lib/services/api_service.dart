@@ -9,7 +9,6 @@ class ApiService {
   static const individualAppMessage =
       'This app is for hospital accounts. Use the MedRoster web app for individual schedules.';
 
-  // Replace with your deployed backend URL in production
   static const _base = String.fromEnvironment(
     'API_URL',
     defaultValue: 'https://medroster-backend.vercel.app',
@@ -19,9 +18,16 @@ class ApiService {
 
   bool get canWrite => profile != null && profile!['role'] != 'staff';
 
+  bool get isAdmin => profile != null && profile!['role'] == 'admin';
+
   bool get hasHospital {
     final id = profile?['hospitalId'];
     return id is String && id.isNotEmpty;
+  }
+
+  String? get hospitalId {
+    final id = profile?['hospitalId'];
+    return id is String && id.isNotEmpty ? id : null;
   }
 
   void clearProfile() {
@@ -43,32 +49,49 @@ class ApiService {
     };
   }
 
-  Future<dynamic> get(String path) async {
-    final res = await http.get(Uri.parse('$_base$path'), headers: await _headers());
+  Future<dynamic> get(String path, {Duration timeout = const Duration(seconds: 30)}) async {
+    final res = await http
+        .get(Uri.parse('$_base$path'), headers: await _headers())
+        .timeout(timeout);
     return _parse(res);
   }
 
-  Future<dynamic> post(String path, Map<String, dynamic> body) async {
-    final res = await http.post(
-      Uri.parse('$_base$path'),
-      headers: await _headers(),
-      body: jsonEncode(body),
-    );
+  Future<dynamic> post(
+    String path,
+    Map<String, dynamic> body, {
+    Duration timeout = const Duration(seconds: 30),
+  }) async {
+    final res = await http
+        .post(
+          Uri.parse('$_base$path'),
+          headers: await _headers(),
+          body: jsonEncode(body),
+        )
+        .timeout(timeout);
     return _parse(res);
   }
 
-  Future<dynamic> patch(String path, Map<String, dynamic> body) async {
-    final res = await http.patch(
-      Uri.parse('$_base$path'),
-      headers: await _headers(),
-      body: jsonEncode(body),
-    );
+  Future<dynamic> patch(String path, Map<String, dynamic> body, {Duration timeout = const Duration(seconds: 30)}) async {
+    final res = await http
+        .patch(
+          Uri.parse('$_base$path'),
+          headers: await _headers(),
+          body: jsonEncode(body),
+        )
+        .timeout(timeout);
     return _parse(res);
   }
 
-  Future<dynamic> delete(String path) async {
-    final res = await http.delete(Uri.parse('$_base$path'), headers: await _headers());
+  Future<dynamic> delete(String path, {Duration timeout = const Duration(seconds: 30)}) async {
+    final res = await http
+        .delete(Uri.parse('$_base$path'), headers: await _headers())
+        .timeout(timeout);
     return _parse(res);
+  }
+
+  List<Map<String, dynamic>> asMaps(dynamic data) {
+    if (data is! List) return [];
+    return data.map((e) => Map<String, dynamic>.from(e as Map)).toList();
   }
 
   dynamic _parse(http.Response res) {
@@ -81,17 +104,17 @@ class ApiService {
       }
     }
     if (res.statusCode >= 200 && res.statusCode < 300) return body;
-    final message = (body is Map && body['error'] != null)
-        ? body['error'].toString()
-        : (res.reasonPhrase ?? 'Unknown error');
-    throw ApiException(message, res.statusCode);
+    final map = body is Map ? Map<String, dynamic>.from(body) : null;
+    final message = map?['error']?.toString() ?? res.reasonPhrase ?? 'Unknown error';
+    throw ApiException(message, res.statusCode, map);
   }
 }
 
 class ApiException implements Exception {
   final String message;
   final int statusCode;
-  ApiException(this.message, this.statusCode);
+  final Map<String, dynamic>? data;
+  ApiException(this.message, this.statusCode, [this.data]);
 
   @override
   String toString() => 'ApiException($statusCode): $message';

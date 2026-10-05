@@ -41,6 +41,12 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>MedRoster needs photo access to import a duty roster picture.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>MedRoster can use the camera to photograph a duty roster.</string>
+	<key>UIFileSharingEnabled</key>
+	<true/>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
