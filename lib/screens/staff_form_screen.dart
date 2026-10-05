@@ -1,21 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../util/dates.dart';
-
-const _ranks = [
-  'Staff Nurse',
-  'Senior Staff Nurse',
-  'Nursing Officer',
-  'Senior Nursing Officer',
-  'Principal Nursing Officer',
-  'Staff Midwife',
-  'Senior Staff Midwife',
-  'Enrolled Nurse',
-  'Nurse Assistant Clinical',
-  'Medical Officer',
-  'Senior Medical Officer',
-  'Specialist',
-];
+import '../util/ghana_data.dart';
 
 const _leaveTypes = [
   'Annual',
@@ -53,6 +39,7 @@ class StaffFormScreen extends StatefulWidget {
 class _StaffFormScreenState extends State<StaffFormScreen> {
   final _firstCtrl = TextEditingController();
   final _lastCtrl = TextEditingController();
+  String _category = 'Nurse';
   String _rank = 'Staff Nurse';
   String _wardRole = 'regular';
   String? _departmentId;
@@ -69,7 +56,12 @@ class _StaffFormScreenState extends State<StaffFormScreen> {
     final s = widget.staff;
     _firstCtrl.text = s?['firstName']?.toString() ?? '';
     _lastCtrl.text = s?['lastName']?.toString() ?? '';
-    _rank = s?['rank']?.toString().isNotEmpty == true ? s!['rank'].toString() : _rank;
+    _category = s?['category']?.toString().isNotEmpty == true ? s!['category'].toString() : 'Nurse';
+    final savedRank = s?['rank']?.toString() ?? '';
+    final available = ranksForCategory(_category);
+    _rank = savedRank.isNotEmpty
+        ? savedRank
+        : (available.isNotEmpty ? available.first : '');
     _wardRole = s?['wardRole']?.toString() ?? 'regular';
     _departmentId = s?['departmentId']?.toString() ?? widget.defaultDepartmentId;
     _wardId = s?['wardId']?.toString() ?? widget.defaultWardId;
@@ -101,6 +93,7 @@ class _StaffFormScreenState extends State<StaffFormScreen> {
     final payload = {
       'firstName': _firstCtrl.text.trim(),
       'lastName': _lastCtrl.text.trim(),
+      'category': _category,
       'rank': _rank,
       'departmentId': _departmentId,
       'wardId': _wardId,
@@ -211,10 +204,15 @@ class _StaffFormScreenState extends State<StaffFormScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final ranks = {
-      ..._ranks,
-      if (_rank.isNotEmpty) _rank,
-    }.toList();
+    final ranks = ranksForCategory(_category);
+    final rankOptions = [
+      if (_rank.isNotEmpty && !ranks.contains(_rank)) _rank,
+      ...ranks,
+    ];
+    final rankValue = rankOptions.contains(_rank)
+        ? _rank
+        : (rankOptions.isNotEmpty ? rankOptions.first : null);
+    final roleValue = wardRoles.any((r) => r.value == _wardRole) ? _wardRole : 'regular';
     return Scaffold(
       appBar: AppBar(title: Text(_isEdit ? 'Edit staff' : 'Add staff')),
       body: ListView(
@@ -225,20 +223,34 @@ class _StaffFormScreenState extends State<StaffFormScreen> {
           TextField(controller: _lastCtrl, decoration: const InputDecoration(labelText: 'Last name')),
           const SizedBox(height: 12),
           DropdownButtonFormField<String>(
-            initialValue: ranks.contains(_rank) ? _rank : ranks.first,
-            decoration: const InputDecoration(labelText: 'Rank'),
-            items: ranks.map((r) => DropdownMenuItem(value: r, child: Text(r))).toList(),
+            key: ValueKey('category-$_category'),
+            initialValue: staffCategories.contains(_category) ? _category : staffCategories.first,
+            decoration: const InputDecoration(labelText: 'Category'),
+            items: staffCategories.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+            onChanged: (v) {
+              if (v == null) return;
+              setState(() {
+                _category = v;
+                final next = ranksForCategory(v);
+                _rank = next.contains(_rank) ? _rank : (next.isNotEmpty ? next.first : '');
+              });
+            },
+          ),
+          const SizedBox(height: 12),
+          DropdownButtonFormField<String>(
+            key: ValueKey('rank-$_category'),
+            initialValue: rankValue,
+            decoration: const InputDecoration(labelText: 'Rank / grade'),
+            items: rankOptions.map((r) => DropdownMenuItem(value: r, child: Text(r))).toList(),
             onChanged: (v) => setState(() => _rank = v ?? _rank),
           ),
           const SizedBox(height: 12),
           DropdownButtonFormField<String>(
-            initialValue: _wardRole,
+            initialValue: roleValue,
             decoration: const InputDecoration(labelText: 'Ward role'),
-            items: const [
-              DropdownMenuItem(value: 'regular', child: Text('Regular')),
-              DropdownMenuItem(value: 'incharge', child: Text('In-charge')),
-              DropdownMenuItem(value: 'assistant', child: Text('Assistant')),
-            ],
+            items: wardRoles
+                .map((r) => DropdownMenuItem(value: r.value, child: Text(r.label)))
+                .toList(),
             onChanged: (v) => setState(() => _wardRole = v ?? _wardRole),
           ),
           if (_error != null) ...[

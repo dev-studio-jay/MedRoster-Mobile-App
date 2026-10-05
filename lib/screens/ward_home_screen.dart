@@ -22,6 +22,7 @@ class _WardHomeScreenState extends State<WardHomeScreen> {
   bool _busyRoster = false;
   String? _error;
   String _search = '';
+  bool _gridView = false;
 
   String? get _hid => HospitalStore.instance.hospitalId;
   bool get _canWrite => ApiService.instance.canWrite;
@@ -216,10 +217,21 @@ class _WardHomeScreenState extends State<WardHomeScreen> {
             ],
           ]),
           const SizedBox(height: 16),
-          TextField(
-            decoration: const InputDecoration(hintText: 'Search by name or rank...', prefixIcon: Icon(Icons.search)),
-            onChanged: (v) => setState(() => _search = v),
-          ),
+          Row(children: [
+            Expanded(
+              child: TextField(
+                decoration: const InputDecoration(hintText: 'Search by name or rank...', prefixIcon: Icon(Icons.search)),
+                onChanged: (v) => setState(() => _search = v),
+              ),
+            ),
+            if (people.isNotEmpty) ...[
+              const SizedBox(width: 8),
+              _ViewPill(
+                gridView: _gridView,
+                onChanged: (v) => setState(() => _gridView = v),
+              ),
+            ],
+          ]),
           const SizedBox(height: 12),
           if (people.isEmpty)
             Padding(
@@ -233,10 +245,32 @@ class _WardHomeScreenState extends State<WardHomeScreen> {
                 onAction: _canWrite ? () => _openStaffForm() : null,
               ),
             )
+          else if (_gridView)
+            GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: people.length,
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                mainAxisSpacing: 8,
+                crossAxisSpacing: 8,
+                childAspectRatio: 0.95,
+              ),
+              itemBuilder: (context, i) => _StaffGridCard(
+                staff: people[i],
+                canWrite: _canWrite,
+                badge: _badge(people[i]),
+                onEdit: () => _openStaffForm(staff: people[i]),
+                onDelete: () => _deleteStaff(people[i]),
+              ),
+            )
           else
             ...people.map((s) => Card(
                   margin: const EdgeInsets.only(bottom: 8),
                   child: ListTile(
+                    leading: CircleAvatar(
+                      child: Text(_initials(s)),
+                    ),
                     title: Text('${s['firstName'] ?? ''} ${s['lastName'] ?? ''}'),
                     subtitle: Text(s['rank']?.toString() ?? s['category']?.toString() ?? 'Staff'),
                     trailing: _canWrite
@@ -260,5 +294,128 @@ class _WardHomeScreenState extends State<WardHomeScreen> {
     if (type == 'pno') return const Chip(label: Text('PNO+'), visualDensity: VisualDensity.compact);
     if (type == 'senior') return const Chip(label: Text('SENIOR'), visualDensity: VisualDensity.compact);
     return null;
+  }
+
+  String _initials(Map<String, dynamic> s) {
+    final a = (s['firstName']?.toString() ?? '').trim();
+    final b = (s['lastName']?.toString() ?? '').trim();
+    return '${a.isNotEmpty ? a[0] : ''}${b.isNotEmpty ? b[0] : ''}'.toUpperCase();
+  }
+}
+
+class _ViewPill extends StatelessWidget {
+  final bool gridView;
+  final ValueChanged<bool> onChanged;
+
+  const _ViewPill({required this.gridView, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: const [BoxShadow(color: Color(0x14000000), blurRadius: 8, offset: Offset(0, 1))],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _pillIcon(
+            selected: !gridView,
+            tooltip: 'List',
+            onTap: () => onChanged(false),
+            icon: Icons.menu,
+          ),
+          _pillIcon(
+            selected: gridView,
+            tooltip: 'Grid',
+            onTap: () => onChanged(true),
+            icon: Icons.grid_view_rounded,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _pillIcon({
+    required bool selected,
+    required String tooltip,
+    required VoidCallback onTap,
+    required IconData icon,
+  }) {
+    const green = Color(0xFF006B3F);
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: selected ? green : Colors.transparent,
+        shape: const CircleBorder(),
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: onTap,
+          child: SizedBox(
+            width: 32,
+            height: 32,
+            child: Icon(icon, size: 18, color: selected ? Colors.white : const Color(0xFF94A3B8)),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _StaffGridCard extends StatelessWidget {
+  final Map<String, dynamic> staff;
+  final bool canWrite;
+  final Widget? badge;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+
+  const _StaffGridCard({
+    required this.staff,
+    required this.canWrite,
+    required this.badge,
+    required this.onEdit,
+    required this.onDelete,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final first = staff['firstName']?.toString() ?? '';
+    final last = staff['lastName']?.toString() ?? '';
+    final initials = '${first.isNotEmpty ? first[0] : ''}${last.isNotEmpty ? last[0] : ''}'.toUpperCase();
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(children: [
+              CircleAvatar(radius: 18, child: Text(initials, style: const TextStyle(fontSize: 12))),
+              const Spacer(),
+              if (badge != null) badge!,
+            ]),
+            const SizedBox(height: 10),
+            Text('$first $last', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700)),
+            Text(
+              staff['rank']?.toString() ?? staff['category']?.toString() ?? 'Staff',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const Spacer(),
+            if (canWrite)
+              Row(children: [
+                TextButton(onPressed: onEdit, child: const Text('Edit')),
+                IconButton(
+                  icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
+                  onPressed: onDelete,
+                ),
+              ]),
+          ],
+        ),
+      ),
+    );
   }
 }
