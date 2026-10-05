@@ -282,7 +282,7 @@ class _ImportRosterScreenState extends State<ImportRosterScreen> {
           ],
           if (_step == 'done' && _result != null)
             Text(
-              '${_result!['imported'] ?? _selectedCount} people on $wardName.',
+              '${_result!['imported'] ?? _selectedCount} staff on $wardName.',
               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
             ),
           if (_error != null) ...[
@@ -378,7 +378,7 @@ class _ImportRosterScreenState extends State<ImportRosterScreen> {
       case 'rules':
         return 'How should we read the file? Core roster rules stay on.';
       case 'done':
-        return 'People are on this ward. Open the roster when you want to edit shifts.';
+        return 'Staff are on this ward. Open the roster when you want to edit shifts.';
       default:
         return '';
     }

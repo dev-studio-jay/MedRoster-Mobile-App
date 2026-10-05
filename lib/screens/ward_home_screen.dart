@@ -117,7 +117,7 @@ class _WardHomeScreenState extends State<WardHomeScreen> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Remove person'),
+        title: const Text('Remove staff'),
         content: Text('Remove ${s['firstName']} ${s['lastName']}? Their assignments will also be deleted.'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
@@ -178,7 +178,7 @@ class _WardHomeScreenState extends State<WardHomeScreen> {
             style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 1.1, color: Colors.grey),
           ),
           Text(ward['name']?.toString() ?? 'Ward', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800)),
-          Text('${people.length} ${people.length == 1 ? 'person' : 'people'} on this ward.'),
+          Text('${people.length} ${people.length == 1 ? 'staff member' : 'staff'} on this ward.'),
           if (latest != null)
             Padding(
               padding: const EdgeInsets.only(top: 6),
@@ -211,7 +211,7 @@ class _WardHomeScreenState extends State<WardHomeScreen> {
               ),
               OutlinedButton(
                 onPressed: () => _openStaffForm(),
-                child: const Text('Add person'),
+                child: const Text('Add staff'),
               ),
             ],
           ]),
@@ -227,9 +227,9 @@ class _WardHomeScreenState extends State<WardHomeScreen> {
               child: EmptyState(
                 icon: Icons.people_outline,
                 message: _canWrite
-                    ? 'Import a duty roster or add people, then open the calendar to edit shifts.'
+                    ? 'Import a duty roster or add staff, then open the calendar to edit shifts.'
                     : 'No staff have been assigned to this ward.',
-                actionLabel: _canWrite ? 'Add person' : null,
+                actionLabel: _canWrite ? 'Add staff' : null,
                 onAction: _canWrite ? () => _openStaffForm() : null,
               ),
             )

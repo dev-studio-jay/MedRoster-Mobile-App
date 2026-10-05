@@ -216,7 +216,7 @@ class _StaffFormScreenState extends State<StaffFormScreen> {
       if (_rank.isNotEmpty) _rank,
     }.toList();
     return Scaffold(
-      appBar: AppBar(title: Text(_isEdit ? 'Edit person' : 'Add person')),
+      appBar: AppBar(title: Text(_isEdit ? 'Edit staff' : 'Add staff')),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
