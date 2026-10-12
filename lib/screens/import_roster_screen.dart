@@ -202,8 +202,13 @@ class _ImportRosterScreenState extends State<ImportRosterScreen> {
       _initSetupFromPreview(data);
     } on ApiException catch (e) {
       setState(() => _error = e.message);
-    } catch (_) {
-      setState(() => _error = 'Could not read that file');
+    } catch (e) {
+      final msg = e.toString().toLowerCase();
+      setState(() {
+        _error = msg.contains('timeout') || msg.contains('timed out')
+            ? 'Reading timed out. Try a smaller file or a clearer photo on Wi‑Fi.'
+            : 'Could not read that file. Use CSV, Word, Excel, PDF, or a clear photo.';
+      });
     } finally {
       if (mounted) setState(() => _loading = false);
     }

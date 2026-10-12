@@ -24,6 +24,9 @@ class AuthService {
   Future<UserCredential> signIn(String email, String password) =>
       _auth.signInWithEmailAndPassword(email: email, password: password);
 
+  Future<void> sendPasswordReset(String email) =>
+      _auth.sendPasswordResetEmail(email: email.trim());
+
   Future<UserCredential> signInWithGoogle() async {
     final account = await _google.signIn();
     if (account == null) {

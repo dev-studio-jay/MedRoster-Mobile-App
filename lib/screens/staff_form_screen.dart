@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../services/api_service.dart';
+import '../theme/app_theme.dart';
 import '../util/dates.dart';
 import '../util/ghana_data.dart';
 
@@ -108,7 +110,13 @@ class _StaffFormScreenState extends State<StaffFormScreen> {
       } else {
         await ApiService.instance.post('/api/hospitals/${widget.hospitalId}/staff', payload);
       }
-      if (mounted) Navigator.pop(context, true);
+      if (mounted) {
+        if (context.canPop()) {
+          context.pop(true);
+        } else {
+          context.go('/ward/$_wardId');
+        }
+      }
     } on ApiException catch (e) {
       setState(() => _error = e.message);
     } finally {
@@ -218,9 +226,14 @@ class _StaffFormScreenState extends State<StaffFormScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          TextField(controller: _firstCtrl, decoration: const InputDecoration(labelText: 'First name')),
+          Text(
+            _isEdit ? 'Update profile and leave windows for this person.' : 'Add someone to this ward’s roster.',
+            style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w500),
+          ),
+          const SizedBox(height: 16),
+          TextField(controller: _firstCtrl, textInputAction: TextInputAction.next, decoration: const InputDecoration(labelText: 'First name')),
           const SizedBox(height: 12),
-          TextField(controller: _lastCtrl, decoration: const InputDecoration(labelText: 'Last name')),
+          TextField(controller: _lastCtrl, textInputAction: TextInputAction.next, decoration: const InputDecoration(labelText: 'Last name')),
           const SizedBox(height: 12),
           DropdownButtonFormField<String>(
             key: ValueKey('category-$_category'),
@@ -255,7 +268,7 @@ class _StaffFormScreenState extends State<StaffFormScreen> {
           ),
           if (_error != null) ...[
             const SizedBox(height: 12),
-            Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+            Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error, fontWeight: FontWeight.w600)),
           ],
           const SizedBox(height: 20),
           FilledButton(
@@ -265,18 +278,30 @@ class _StaffFormScreenState extends State<StaffFormScreen> {
           if (_isEdit) ...[
             const SizedBox(height: 28),
             Row(children: [
-              const Expanded(child: Text('Leave windows', style: TextStyle(fontWeight: FontWeight.w700))),
-              TextButton(onPressed: _addLeave, child: const Text('Add')),
+              const Expanded(child: Text('Leave windows', style: TextStyle(fontWeight: FontWeight.w800))),
+              TextButton.icon(onPressed: _addLeave, icon: const Icon(Icons.add, size: 18), label: const Text('Add leave')),
             ]),
-            if (_leave.isEmpty) const Text('No leave recorded.'),
+            Text(
+              'Approved leave blocks shift assignment on those days.',
+              style: TextStyle(color: AppColors.muted, fontSize: 12, fontWeight: FontWeight.w500),
+            ),
+            const SizedBox(height: 8),
+            if (_leave.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 12),
+                child: Text('No leave recorded.', style: TextStyle(color: AppColors.muted)),
+              ),
             for (final rec in _leave)
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                title: Text(rec['leaveType']?.toString() ?? 'Leave'),
-                subtitle: Text('${dateKeyAny(rec['startDate'])} – ${dateKeyAny(rec['endDate'])}'),
-                trailing: IconButton(
-                  icon: const Icon(Icons.close),
-                  onPressed: () => _removeLeave((rec['id'] ?? rec['_id']).toString()),
+              Card(
+                margin: const EdgeInsets.only(bottom: 8),
+                child: ListTile(
+                  title: Text(rec['leaveType']?.toString() ?? 'Leave', style: const TextStyle(fontWeight: FontWeight.w700)),
+                  subtitle: Text('${dateKeyAny(rec['startDate'])} – ${dateKeyAny(rec['endDate'])}'),
+                  trailing: IconButton(
+                    icon: const Icon(Icons.close),
+                    tooltip: 'Remove leave',
+                    onPressed: () => _removeLeave((rec['id'] ?? rec['_id']).toString()),
+                  ),
                 ),
               ),
           ],

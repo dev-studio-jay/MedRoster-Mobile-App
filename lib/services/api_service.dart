@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'auth_service.dart';
@@ -5,9 +6,6 @@ import 'auth_service.dart';
 class ApiService {
   ApiService._();
   static final instance = ApiService._();
-
-  static const individualAppMessage =
-      'This app is for hospital accounts. Use the MedRoster web app for individual schedules.';
 
   static const _base = String.fromEnvironment(
     'API_URL',
@@ -30,6 +28,14 @@ class ApiService {
     return id is String && id.isNotEmpty ? id : null;
   }
 
+  String get accountType {
+    final t = profile?['accountType']?.toString();
+    if (t == 'individual' || t == 'enterprise') return t!;
+    return hasHospital ? 'enterprise' : 'individual';
+  }
+
+  bool get isIndividualAccount => accountType == 'individual' || !hasHospital;
+
   void clearProfile() {
     profile = null;
   }
@@ -50,10 +56,14 @@ class ApiService {
   }
 
   Future<dynamic> get(String path, {Duration timeout = const Duration(seconds: 30)}) async {
-    final res = await http
-        .get(Uri.parse('$_base$path'), headers: await _headers())
-        .timeout(timeout);
-    return _parse(res);
+    try {
+      final res = await http
+          .get(Uri.parse('$_base$path'), headers: await _headers())
+          .timeout(timeout);
+      return _parse(res);
+    } on TimeoutException {
+      throw ApiException('Request timed out. Check your connection and try again.', 408);
+    }
   }
 
   Future<dynamic> post(
@@ -61,46 +71,62 @@ class ApiService {
     Map<String, dynamic> body, {
     Duration timeout = const Duration(seconds: 30),
   }) async {
-    final res = await http
-        .post(
-          Uri.parse('$_base$path'),
-          headers: await _headers(),
-          body: jsonEncode(body),
-        )
-        .timeout(timeout);
-    return _parse(res);
+    try {
+      final res = await http
+          .post(
+            Uri.parse('$_base$path'),
+            headers: await _headers(),
+            body: jsonEncode(body),
+          )
+          .timeout(timeout);
+      return _parse(res);
+    } on TimeoutException {
+      throw ApiException('Request timed out. Large files can take a minute — try again on a stable network.', 408);
+    }
   }
 
   Future<dynamic> patch(String path, Map<String, dynamic> body, {Duration timeout = const Duration(seconds: 30)}) async {
-    final res = await http
-        .patch(
-          Uri.parse('$_base$path'),
-          headers: await _headers(),
-          body: jsonEncode(body),
-        )
-        .timeout(timeout);
-    return _parse(res);
+    try {
+      final res = await http
+          .patch(
+            Uri.parse('$_base$path'),
+            headers: await _headers(),
+            body: jsonEncode(body),
+          )
+          .timeout(timeout);
+      return _parse(res);
+    } on TimeoutException {
+      throw ApiException('Request timed out. Check your connection and try again.', 408);
+    }
   }
 
   Future<dynamic> delete(String path, {Duration timeout = const Duration(seconds: 30)}) async {
-    final res = await http
-        .delete(Uri.parse('$_base$path'), headers: await _headers())
-        .timeout(timeout);
-    return _parse(res);
+    try {
+      final res = await http
+          .delete(Uri.parse('$_base$path'), headers: await _headers())
+          .timeout(timeout);
+      return _parse(res);
+    } on TimeoutException {
+      throw ApiException('Request timed out. Check your connection and try again.', 408);
+    }
   }
 
   /// Authenticated binary download (e.g. CSV template).
   Future<List<int>> getBytes(String path, {Duration timeout = const Duration(seconds: 30)}) async {
-    final headers = await _headers();
-    headers.remove('Content-Type');
-    final res = await http.get(Uri.parse('$_base$path'), headers: headers).timeout(timeout);
-    if (res.statusCode >= 200 && res.statusCode < 300) return res.bodyBytes;
-    dynamic body;
     try {
-      body = res.body.isNotEmpty ? jsonDecode(res.body) : null;
-    } catch (_) {}
-    final map = body is Map ? Map<String, dynamic>.from(body) : null;
-    throw ApiException(map?['error']?.toString() ?? res.reasonPhrase ?? 'Download failed', res.statusCode, map);
+      final headers = await _headers();
+      headers.remove('Content-Type');
+      final res = await http.get(Uri.parse('$_base$path'), headers: headers).timeout(timeout);
+      if (res.statusCode >= 200 && res.statusCode < 300) return res.bodyBytes;
+      dynamic body;
+      try {
+        body = res.body.isNotEmpty ? jsonDecode(res.body) : null;
+      } catch (_) {}
+      final map = body is Map ? Map<String, dynamic>.from(body) : null;
+      throw ApiException(map?['error']?.toString() ?? res.reasonPhrase ?? 'Download failed', res.statusCode, map);
+    } on TimeoutException {
+      throw ApiException('Download timed out. Check your connection and try again.', 408);
+    }
   }
 
   List<Map<String, dynamic>> asMaps(dynamic data) {

@@ -4,17 +4,17 @@
 
 Flutter client for MedRoster — hospital workforce management for Ghana Health Service facilities.
 
-Signs in with **Firebase Auth** and talks to the MedRoster API for hospitals, wards, staff, import, and schedules.
+Signs in with **Firebase Auth** and talks to the MedRoster API for hospitals, wards, staff, import, and schedules. Parity with the web client for enterprise, individual, and guest modes.
 
 ---
 
 ## Stack
 
 - **Flutter** (Dart 3.9+)
-- **Firebase Auth** + `firebase_core`
+- **Firebase Auth** + `firebase_core` + `google_sign_in`
 - **go_router** for navigation
 - **http** + Firebase ID tokens for API calls
-- **google_sign_in**, **google_fonts**, **pdf** / **excel** / **share_plus** for auth + export
+- **google_fonts**, **pdf** / **excel** / **share_plus**, **shared_preferences** (guest)
 
 ---
 
@@ -30,13 +30,15 @@ Signs in with **Firebase Auth** and talks to the MedRoster API for hospitals, wa
 
 2. Ensure Firebase is configured for your platforms (`lib/firebase_options.dart` via FlutterFire CLI, plus Android/iOS GoogleService files if needed).
 
-3. Start the [backend](https://github.com/blaze308/medroster-backend) on port 4000.
+3. For Google / phone auth on a physical Android device, add the app SHA-1/SHA-256 in Firebase Console. Enable Phone auth and allow Ghana under SMS region policy.
 
-4. Point the app at the API (defaults to Android emulator → host machine):
+4. Start the [backend](https://github.com/blaze308/medroster-backend) on port 4000.
+
+5. Point the app at the API:
 
    ```bash
-   # Android emulator (default)
-   flutter run
+   # Android emulator (default production API unless overridden)
+   flutter run --dart-define=API_URL=http://10.0.2.2:4000
 
    # Physical device / other host
    flutter run --dart-define=API_URL=http://YOUR_LAN_IP:4000
@@ -51,18 +53,23 @@ Signs in with **Firebase Auth** and talks to the MedRoster API for hospitals, wa
 
 | Route | Screen |
 |-------|--------|
-| `/auth/login` | Sign in (email, Google, phone OTP) |
-| `/auth/register` | Register hospital admin (email, Google, phone) |
+| `/auth/login` | Sign in (email, Google, phone OTP) + password reset |
+| `/auth/register` | Register individual or hospital |
 | `/auth/join` | Join hospital via join code |
-| `/` | Hospital shell (redirects to a ward) |
+| `/guest` | Guest sandbox roster (local, capped exports) |
+| `/individual` | Individual cloud schedules + upgrade |
+| `/individual/:schedId` | Individual roster editor |
+| `/sandbox-import/:mode` | Guest/individual import + legend setup |
+| `/` | Hospital shell (redirects to ward or `/individual`) |
+| `/setup` | Department template picker |
 | `/ward/:wardId` | Ward home |
-| `/import/:wardId` | Import roster (CSV / file / photo + legend setup) |
-| `/schedule/:schedId` | Roster calendar (assign, generate, validate, export) |
+| `/staff/:wardId` | Add / edit staff (+ leave) |
+| `/import/:wardId` | Hospital import (CSV / file / photo + legend) |
+| `/schedule/:schedId` | Enterprise calendar (assign, generate, validate, export) |
 | `/wards` | Add / edit departments & wards |
 | `/settings` | Join code |
-| `/setup` | Department template picker |
 
-Unauthenticated users are redirected to login.
+Unauthenticated users are redirected to login (except `/guest` and auth routes).
 
 ---
 
@@ -72,29 +79,56 @@ Unauthenticated users are redirected to login.
 lib/
 ├── main.dart
 ├── firebase_options.dart
+├── theme/app_theme.dart
 ├── services/
 │   ├── auth_service.dart
 │   └── api_service.dart
-├── state/
-│   └── hospital_store.dart
+├── state/hospital_store.dart
 ├── util/
 │   ├── dates.dart
-│   └── org_units.dart
+│   ├── ghana_data.dart
+│   ├── org_units.dart
+│   ├── auth_errors.dart
+│   ├── guest_storage.dart
+│   ├── roster_setup.dart
+│   ├── roster_export.dart
+│   └── sandbox_roster.dart
 ├── screens/
 │   ├── login_screen.dart
 │   ├── register_screen.dart
+│   ├── join_screen.dart
+│   ├── guest_screen.dart
+│   ├── individual_home_screen.dart
+│   ├── individual_schedule_screen.dart
+│   ├── sandbox_schedule_screen.dart
+│   ├── sandbox_import_screen.dart
 │   ├── hospital_shell.dart
 │   ├── ward_home_screen.dart
+│   ├── staff_form_screen.dart
+│   ├── staff_form_route.dart
 │   ├── import_roster_screen.dart
 │   ├── schedule_screen.dart
-│   ├── staff_form_screen.dart
 │   ├── wards_screen.dart
 │   ├── settings_screen.dart
 │   └── setup_screen.dart
 └── widgets/
+    ├── auth_widgets.dart
     ├── empty_state.dart
-    └── error_view.dart
+    ├── error_view.dart
+    └── rules_sheet.dart
 ```
+
+---
+
+## Smoke-test checklist
+
+- [ ] **Admin write** — register enterprise → setup templates → add ward → staff → create month roster → assign / generate / validate / export
+- [ ] **Staff read-only** — join via code → open ward/schedule → cannot edit staff or assign
+- [ ] **Individual** — register individual → create schedule → import → generate → export → upgrade to enterprise
+- [ ] **Guest** — try as guest → import/assign → export until cap → register and confirm migrate
+- [ ] **Auth** — email, Google, phone OTP, forgot password, join hospital
+- [ ] **Import** — CSV template + photo/PDF roster with legend confirmation (hospital + sandbox)
+- [ ] **Export share** — PDF / Excel / CSV from enterprise and sandbox schedules
 
 ---
 

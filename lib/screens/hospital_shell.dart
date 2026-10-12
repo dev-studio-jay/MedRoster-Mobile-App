@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import '../state/hospital_store.dart';
+import '../theme/app_theme.dart';
 import '../util/org_units.dart';
 import '../widgets/error_view.dart';
 
@@ -45,7 +46,10 @@ class _HospitalShellState extends State<HospitalShell> {
     if (!mounted || _store.loading) return;
     final loc = GoRouterState.of(context).matchedLocation;
     if (loc != '/') return;
-    if (!ApiService.instance.hasHospital) return;
+    if (!ApiService.instance.hasHospital) {
+      context.go('/individual');
+      return;
+    }
     if (_store.departments.isEmpty && ApiService.instance.canWrite) {
       context.go('/setup');
       return;
@@ -74,36 +78,7 @@ class _HospitalShellState extends State<HospitalShell> {
       return Scaffold(body: ErrorView(message: _store.error!, onRetry: _store.load));
     }
     if (!ApiService.instance.hasHospital) {
-      return Scaffold(
-        appBar: AppBar(
-          title: const Text('MedRoster'),
-          actions: [IconButton(icon: const Icon(Icons.logout), onPressed: _signOut)],
-        ),
-        body: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(32),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  ApiService.individualAppMessage,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(fontWeight: FontWeight.w600, height: 1.4),
-                ),
-                const SizedBox(height: 20),
-                FilledButton(
-                  onPressed: () => context.go('/auth/join'),
-                  child: const Text('Join a hospital'),
-                ),
-                TextButton(
-                  onPressed: () => context.go('/auth/register'),
-                  child: const Text('Register a hospital'),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     final loc = GoRouterState.of(context).matchedLocation;
@@ -142,16 +117,16 @@ class _WardDrawer extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(h['name']?.toString() ?? 'Hospital', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                Text(h['name']?.toString() ?? 'Hospital', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
                 Text(
                   [h['type'], h['region']].where((e) => e != null && e.toString().isNotEmpty).join(' · '),
-                  style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
+                  style: theme.textTheme.bodySmall?.copyWith(color: AppColors.muted, fontWeight: FontWeight.w500),
                 ),
               ]),
             ),
             const Padding(
               padding: EdgeInsets.fromLTRB(16, 12, 16, 4),
-              child: Text('WARDS', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 1.2, color: Colors.grey)),
+              child: Text('WARDS', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1.2, color: AppColors.teal)),
             ),
             if (store.departments.isEmpty)
               const ListTile(dense: true, title: Text('No wards yet')),
@@ -177,8 +152,14 @@ class _WardDrawer extends StatelessWidget {
             const Divider(),
             const Padding(
               padding: EdgeInsets.fromLTRB(16, 8, 16, 4),
-              child: Text('HOSPITAL', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 1.2, color: Colors.grey)),
+              child: Text('HOSPITAL', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1.2, color: AppColors.teal)),
             ),
+            if (!canWrite)
+              const ListTile(
+                dense: true,
+                leading: Icon(Icons.visibility_outlined, size: 20),
+                title: Text('Staff view (read-only)'),
+              ),
             if (canWrite)
               ListTile(
                 leading: const Icon(Icons.account_tree_outlined),

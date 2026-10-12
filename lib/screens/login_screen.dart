@@ -35,7 +35,11 @@ class _LoginScreenState extends State<LoginScreen> {
       await ApiService.instance.loadProfile();
     } catch (_) {}
     if (!mounted) return;
-    context.go('/');
+    if (ApiService.instance.isIndividualAccount) {
+      context.go('/individual');
+    } else {
+      context.go('/');
+    }
   }
 
   Future<void> _submit() async {
@@ -66,6 +70,29 @@ class _LoginScreenState extends State<LoginScreen> {
       setState(() => _error = mapAuthError(e, 'Google sign-in failed.'));
     } finally {
       if (mounted) setState(() => _googleLoading = false);
+    }
+  }
+
+  Future<void> _forgotPassword() async {
+    final email = _emailCtrl.text.trim();
+    if (email.isEmpty || !email.contains('@')) {
+      setState(() => _error = 'Enter your email above, then tap Forgot password.');
+      return;
+    }
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      await AuthService.instance.sendPasswordReset(email);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Password reset email sent to $email')),
+      );
+    } catch (e) {
+      setState(() => _error = mapAuthError(e, 'Could not send reset email.'));
+    } finally {
+      if (mounted) setState(() => _loading = false);
     }
   }
 
@@ -123,6 +150,12 @@ class _LoginScreenState extends State<LoginScreen> {
                     onPressed: () => context.go('/auth/join'),
                     child: const Text('Join hospital'),
                   ),
+                  Text(' · ', style: TextStyle(color: AppColors.muted)),
+                  TextButton(
+                    style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: Size.zero, tapTargetSize: MaterialTapTargetSize.shrinkWrap),
+                    onPressed: () => context.go('/guest'),
+                    child: const Text('Try as guest'),
+                  ),
                 ],
               ),
               const SizedBox(height: 20),
@@ -165,11 +198,18 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ]),
                 ),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: _loading ? null : _forgotPassword,
+                    child: const Text('Forgot password?'),
+                  ),
+                ),
                 if (_error != null) ...[
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 4),
                   AuthErrorBanner(message: _error!),
                 ],
-                const SizedBox(height: 20),
+                const SizedBox(height: 12),
                 FilledButton(
                   onPressed: _loading ? null : _submit,
                   child: _loading

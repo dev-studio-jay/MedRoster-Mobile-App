@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/app_theme.dart';
 
 class ErrorView extends StatelessWidget {
   final String message;
@@ -8,13 +9,26 @@ class ErrorView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final error = Theme.of(context).colorScheme.error;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
-          const Icon(Icons.error_outline, size: 56, color: Colors.red),
-          const SizedBox(height: 12),
-          Text(message, textAlign: TextAlign.center, style: TextStyle(color: Colors.grey[700])),
+          Container(
+            width: 72,
+            height: 72,
+            decoration: BoxDecoration(
+              color: error.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Icon(Icons.error_outline, size: 36, color: error),
+          ),
+          const SizedBox(height: 14),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: AppColors.deep, fontWeight: FontWeight.w600, height: 1.4),
+          ),
           const SizedBox(height: 20),
           FilledButton.icon(
             onPressed: onRetry,

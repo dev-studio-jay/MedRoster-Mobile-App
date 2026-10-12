@@ -9,6 +9,10 @@ import 'theme/app_theme.dart';
 import 'screens/login_screen.dart';
 import 'screens/register_screen.dart';
 import 'screens/join_screen.dart';
+import 'screens/guest_screen.dart';
+import 'screens/individual_home_screen.dart';
+import 'screens/individual_schedule_screen.dart';
+import 'screens/sandbox_import_screen.dart';
 import 'screens/hospital_shell.dart';
 import 'screens/ward_home_screen.dart';
 import 'screens/wards_screen.dart';
@@ -16,6 +20,7 @@ import 'screens/settings_screen.dart';
 import 'screens/setup_screen.dart';
 import 'screens/schedule_screen.dart';
 import 'screens/import_roster_screen.dart';
+import 'screens/staff_form_route.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -30,22 +35,42 @@ final _router = GoRouter(
     final loc = state.matchedLocation;
     final onAuth = loc.startsWith('/auth');
     final onJoin = loc == '/auth/join';
+    final onGuest = loc == '/guest' || loc.startsWith('/sandbox-import/guest');
 
-    if (!loggedIn && !onAuth) {
+    if (!loggedIn) {
+      if (onAuth || onGuest) return null;
       ApiService.instance.clearProfile();
       HospitalStore.instance.hospital = null;
       HospitalStore.instance.error = null;
       HospitalStore.instance.loading = false;
       return '/auth/login';
     }
-    // Allow join while logged out; bounce other auth routes when signed in
-    if (loggedIn && onAuth && !onJoin) return '/';
+
+    // Signed-in users leaving auth (except join) go to the hub
+    if (onAuth && !onJoin) return '/';
     return null;
   },
   routes: [
     GoRoute(path: '/auth/login', builder: (_, __) => const LoginScreen()),
     GoRoute(path: '/auth/register', builder: (_, __) => const RegisterScreen()),
     GoRoute(path: '/auth/join', builder: (_, __) => const JoinScreen()),
+    GoRoute(path: '/guest', builder: (_, __) => const GuestScreen()),
+    GoRoute(path: '/individual', builder: (_, __) => const IndividualHomeScreen()),
+    GoRoute(
+      path: '/individual/:schedId',
+      builder: (_, state) => IndividualScheduleScreen(scheduleId: state.pathParameters['schedId']!),
+    ),
+    GoRoute(
+      path: '/sandbox-import/:mode',
+      builder: (context, state) {
+        final extra = state.extra;
+        final setup = extra is Map ? Map<String, dynamic>.from(extra) : null;
+        return SandboxImportScreen(
+          mode: state.pathParameters['mode']!,
+          existingSetup: setup,
+        );
+      },
+    ),
     GoRoute(
       path: '/schedule/:schedId',
       builder: (_, state) => ScheduleScreen(scheduleId: state.pathParameters['schedId']!),
@@ -53,6 +78,13 @@ final _router = GoRouter(
     GoRoute(
       path: '/import/:wardId',
       builder: (_, state) => ImportRosterScreen(wardId: state.pathParameters['wardId']!),
+    ),
+    GoRoute(
+      path: '/staff/:wardId',
+      builder: (_, state) => StaffFormRoute(
+        wardId: state.pathParameters['wardId']!,
+        staffId: state.uri.queryParameters['staffId'],
+      ),
     ),
     ShellRoute(
       builder: (context, state, child) => HospitalShell(child: child),

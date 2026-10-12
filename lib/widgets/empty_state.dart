@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/app_theme.dart';
 
 class EmptyState extends StatelessWidget {
   final IconData icon;
@@ -20,9 +21,21 @@ class EmptyState extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.all(32),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Icon(icon, size: 64, color: Colors.grey[300]),
+          Container(
+            width: 72,
+            height: 72,
+            decoration: BoxDecoration(
+              color: AppColors.teal.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Icon(icon, size: 36, color: AppColors.teal.withValues(alpha: 0.7)),
+          ),
           const SizedBox(height: 16),
-          Text(message, textAlign: TextAlign.center, style: TextStyle(color: Colors.grey[500], fontSize: 15)),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: AppColors.muted, fontSize: 15, fontWeight: FontWeight.w500, height: 1.4),
+          ),
           if (actionLabel != null && onAction != null) ...[
             const SizedBox(height: 20),
             FilledButton.icon(

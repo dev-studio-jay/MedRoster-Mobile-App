@@ -5,6 +5,7 @@ import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
 import '../util/auth_errors.dart';
 import '../util/ghana_data.dart';
+import '../util/guest_storage.dart';
 import '../widgets/auth_widgets.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -27,8 +28,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _showPhone = false;
   String? _error;
 
-  String _hospitalType = hospitalTypes.first;
+  /// 0 = account type, 1 = hospital (enterprise), 2 = credentials
+  int _step = 0;
+  String _accountType = 'enterprise';
+  String _hospitalType = hospitalTypes.contains('District Hospital') ? 'District Hospital' : hospitalTypes.first;
   String _region = ghanaRegions.contains('Greater Accra') ? 'Greater Accra' : ghanaRegions.first;
+
+  bool get _isEnterprise => _accountType == 'enterprise';
 
   @override
   void dispose() {
@@ -40,15 +46,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
     super.dispose();
   }
 
-  Map<String, dynamic> get _hospitalPayload => {
-        'hospitalName': _hospitalNameCtrl.text.trim(),
-        'hospitalType': _hospitalType,
-        'hospitalRegion': _region,
-        'hospitalLocation': _hospitalLocationCtrl.text.trim(),
-        'accountType': 'enterprise',
+  Map<String, dynamic> get _basePayload => {
+        'accountType': _accountType,
+        if (_isEnterprise) ...{
+          'hospitalName': _hospitalNameCtrl.text.trim(),
+          'hospitalType': _hospitalType,
+          'hospitalRegion': _region,
+          'hospitalLocation': _hospitalLocationCtrl.text.trim(),
+        },
       };
 
   bool _validateHospital() {
+    if (!_isEnterprise) return true;
     if (_hospitalNameCtrl.text.trim().isEmpty) {
       setState(() => _error = 'Hospital name is required');
       return false;
@@ -56,11 +65,33 @@ class _RegisterScreenState extends State<RegisterScreen> {
     return true;
   }
 
+  Future<void> _migrateGuestIfNeeded() async {
+    if (_accountType != 'individual') return;
+    final guest = await takeGuestDataForMigration();
+    if (guest == null || guest['startDate'] == null || guest['endDate'] == null) return;
+    try {
+      await ApiService.instance.post('/api/me/schedules', {
+        'name': guest['name'] ?? 'Migrated guest schedule',
+        'startDate': guest['startDate'],
+        'endDate': guest['endDate'],
+        'staff': guest['staff'] ?? [],
+        'assignments': guest['assignments'] ?? [],
+        'holidays': guest['holidays'] ?? [],
+      });
+    } catch (_) {}
+  }
+
   Future<void> _goHome() async {
     try {
       await ApiService.instance.loadProfile();
+      await _migrateGuestIfNeeded();
     } catch (_) {}
-    if (mounted) context.go('/');
+    if (!mounted) return;
+    if (ApiService.instance.isIndividualAccount) {
+      context.go('/individual');
+    } else {
+      context.go('/');
+    }
   }
 
   Future<void> _submitEmail() async {
@@ -72,9 +103,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     });
     try {
       await ApiService.instance.post('/api/auth/register', {
-        ..._hospitalPayload,
-        'region': _region,
-        'adminName': _adminNameCtrl.text.trim(),
+        ..._basePayload,
         'name': _adminNameCtrl.text.trim(),
         'email': _emailCtrl.text.trim(),
         'password': _passCtrl.text,
@@ -100,7 +129,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       await AuthService.instance.signInWithGoogle();
       final name = AuthService.instance.currentUser?.displayName ?? _adminNameCtrl.text.trim();
       await ApiService.instance.post('/api/auth/register-google', {
-        ..._hospitalPayload,
+        ..._basePayload,
         'name': name,
       });
       await _goHome();
@@ -129,7 +158,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     });
     try {
       await ApiService.instance.post('/api/auth/register-phone', {
-        ..._hospitalPayload,
+        ..._basePayload,
         'name': _adminNameCtrl.text.trim(),
       });
       await _goHome();
@@ -150,7 +179,21 @@ class _RegisterScreenState extends State<RegisterScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('Register hospital')),
+      appBar: AppBar(
+        title: Text(_step == 0 ? 'Create account' : _step == 1 ? 'Hospital details' : 'Your account'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            if (_step == 0) {
+              context.go('/auth/login');
+            } else if (_step == 2 && !_isEnterprise) {
+              setState(() => _step = 0);
+            } else {
+              setState(() => _step -= 1);
+            }
+          },
+        ),
+      ),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
@@ -159,77 +202,57 @@ class _RegisterScreenState extends State<RegisterScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text('Hospital details', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _hospitalNameCtrl,
-                  textInputAction: TextInputAction.next,
-                  decoration: const InputDecoration(labelText: 'Hospital name', prefixIcon: Icon(Icons.local_hospital_outlined)),
-                  validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
-                ),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                  initialValue: _hospitalType,
-                  decoration: const InputDecoration(labelText: 'Hospital type', prefixIcon: Icon(Icons.category_outlined)),
-                  items: hospitalTypes.map((t) => DropdownMenuItem(value: t, child: Text(t))).toList(),
-                  onChanged: (v) => setState(() => _hospitalType = v!),
-                ),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                  initialValue: _region,
-                  decoration: const InputDecoration(labelText: 'Region', prefixIcon: Icon(Icons.location_on_outlined)),
-                  items: ghanaRegions.map((r) => DropdownMenuItem(value: r, child: Text(r))).toList(),
-                  onChanged: (v) => setState(() => _region = v!),
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _hospitalLocationCtrl,
-                  decoration: const InputDecoration(labelText: 'Location (optional)', prefixIcon: Icon(Icons.place_outlined)),
-                ),
-                const SizedBox(height: 24),
-                Text('Admin account', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _adminNameCtrl,
-                  textInputAction: TextInputAction.next,
-                  decoration: const InputDecoration(labelText: 'Full name', prefixIcon: Icon(Icons.person_outline)),
-                  validator: (v) => (!_showPhone && (v == null || v.isEmpty)) ? 'Required' : null,
-                ),
-                const SizedBox(height: 16),
-                if (!_showPhone) ...[
-                  GoogleSignInButton(
-                    loading: _googleLoading,
-                    label: 'Register with Google',
-                    onPressed: _submitGoogle,
+                if (_step == 0) ...[
+                  Text('Who is this for?', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+                  const SizedBox(height: 8),
+                  Text('Pick how you’ll use MedRoster. You can upgrade later.', style: TextStyle(color: AppColors.muted)),
+                  const SizedBox(height: 20),
+                  _AccountTypeCard(
+                    selected: _accountType == 'individual',
+                    title: 'Individual',
+                    desc: 'Personal monthly rosters. Save to the cloud. Up to 50 staff.',
+                    onTap: () => setState(() => _accountType = 'individual'),
                   ),
                   const SizedBox(height: 10),
-                  OutlinedButton(
-                    onPressed: () => setState(() => _showPhone = true),
-                    child: const Text('Register with phone'),
+                  _AccountTypeCard(
+                    selected: _accountType == 'enterprise',
+                    title: 'Hospital / Enterprise',
+                    desc: 'Full hospital account with departments, wards, join code, and schedules.',
+                    onTap: () => setState(() => _accountType = 'enterprise'),
                   ),
-                  const AuthDivider(),
+                  const SizedBox(height: 24),
+                  FilledButton(
+                    onPressed: () => setState(() {
+                      _error = null;
+                      _step = _isEnterprise ? 1 : 2;
+                    }),
+                    child: const Text('Continue'),
+                  ),
+                ],
+                if (_step == 1) ...[
                   TextFormField(
-                    controller: _emailCtrl,
-                    keyboardType: TextInputType.emailAddress,
-                    textInputAction: TextInputAction.next,
-                    decoration: const InputDecoration(labelText: 'Email address', prefixIcon: Icon(Icons.email_outlined)),
-                    validator: (v) => (v == null || !v.contains('@')) ? 'Enter a valid email' : null,
+                    controller: _hospitalNameCtrl,
+                    decoration: const InputDecoration(labelText: 'Hospital name', prefixIcon: Icon(Icons.local_hospital_outlined)),
+                    validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    initialValue: _hospitalType,
+                    decoration: const InputDecoration(labelText: 'Hospital type'),
+                    items: hospitalTypes.map((t) => DropdownMenuItem(value: t, child: Text(t))).toList(),
+                    onChanged: (v) => setState(() => _hospitalType = v!),
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    initialValue: _region,
+                    decoration: const InputDecoration(labelText: 'Region'),
+                    items: ghanaRegions.map((r) => DropdownMenuItem(value: r, child: Text(r))).toList(),
+                    onChanged: (v) => setState(() => _region = v!),
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
-                    controller: _passCtrl,
-                    obscureText: _obscure,
-                    textInputAction: TextInputAction.done,
-                    onFieldSubmitted: (_) => _submitEmail(),
-                    decoration: InputDecoration(
-                      labelText: 'Password',
-                      prefixIcon: const Icon(Icons.lock_outline),
-                      suffixIcon: IconButton(
-                        icon: Icon(_obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined),
-                        onPressed: () => setState(() => _obscure = !_obscure),
-                      ),
-                    ),
-                    validator: (v) => (v == null || v.length < 8) ? 'Minimum 8 characters' : null,
+                    controller: _hospitalLocationCtrl,
+                    decoration: const InputDecoration(labelText: 'Location (optional)'),
                   ),
                   if (_error != null) ...[
                     const SizedBox(height: 12),
@@ -237,32 +260,119 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ],
                   const SizedBox(height: 20),
                   FilledButton(
-                    onPressed: _loading ? null : _submitEmail,
-                    child: _loading
-                        ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                        : const Text('Create account'),
+                    onPressed: () {
+                      if (_hospitalNameCtrl.text.trim().isEmpty) {
+                        setState(() => _error = 'Hospital name is required');
+                        return;
+                      }
+                      setState(() {
+                        _error = null;
+                        _step = 2;
+                      });
+                    },
+                    child: const Text('Continue'),
                   ),
-                ] else ...[
-                  Text('Name above is required for phone registration.', style: TextStyle(color: AppColors.muted, fontSize: 12)),
-                  const SizedBox(height: 12),
-                  PhoneAuthPanel(buttonLabel: 'Send OTP', onVerified: _afterPhoneVerified),
-                  TextButton(onPressed: () => setState(() => _showPhone = false), child: const Text('Back to email / Google')),
-                  if (_error != null) ...[
-                    const SizedBox(height: 8),
-                    AuthErrorBanner(message: _error!),
+                ],
+                if (_step == 2) ...[
+                  TextFormField(
+                    controller: _adminNameCtrl,
+                    decoration: const InputDecoration(labelText: 'Full name', prefixIcon: Icon(Icons.person_outline)),
+                    validator: (v) => (!_showPhone && (v == null || v.isEmpty)) ? 'Required' : null,
+                  ),
+                  const SizedBox(height: 16),
+                  if (!_showPhone) ...[
+                    GoogleSignInButton(loading: _googleLoading, label: 'Register with Google', onPressed: _submitGoogle),
+                    const SizedBox(height: 10),
+                    OutlinedButton(onPressed: () => setState(() => _showPhone = true), child: const Text('Register with phone')),
+                    const AuthDivider(),
+                    TextFormField(
+                      controller: _emailCtrl,
+                      keyboardType: TextInputType.emailAddress,
+                      decoration: const InputDecoration(labelText: 'Email address', prefixIcon: Icon(Icons.email_outlined)),
+                      validator: (v) => (v == null || !v.contains('@')) ? 'Enter a valid email' : null,
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: _passCtrl,
+                      obscureText: _obscure,
+                      decoration: InputDecoration(
+                        labelText: 'Password',
+                        prefixIcon: const Icon(Icons.lock_outline),
+                        suffixIcon: IconButton(
+                          icon: Icon(_obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined),
+                          onPressed: () => setState(() => _obscure = !_obscure),
+                        ),
+                      ),
+                      validator: (v) => (v == null || v.length < 8) ? 'Minimum 8 characters' : null,
+                    ),
+                    if (_error != null) ...[
+                      const SizedBox(height: 12),
+                      AuthErrorBanner(message: _error!),
+                    ],
+                    const SizedBox(height: 20),
+                    FilledButton(
+                      onPressed: _loading ? null : _submitEmail,
+                      child: _loading
+                          ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                          : Text(_isEnterprise ? 'Create hospital account' : 'Create individual account'),
+                    ),
+                  ] else ...[
+                    PhoneAuthPanel(buttonLabel: 'Send OTP', onVerified: _afterPhoneVerified),
+                    TextButton(onPressed: () => setState(() => _showPhone = false), child: const Text('Back to email / Google')),
+                    if (_error != null) ...[
+                      const SizedBox(height: 8),
+                      AuthErrorBanner(message: _error!),
+                    ],
                   ],
                 ],
                 const SizedBox(height: 16),
                 Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                  Text('Already have an account? ', style: TextStyle(color: AppColors.muted)),
                   TextButton(onPressed: () => context.go('/auth/login'), child: const Text('Sign in')),
                   Text(' · ', style: TextStyle(color: AppColors.muted)),
-                  TextButton(onPressed: () => context.go('/auth/join'), child: const Text('Join')),
+                  TextButton(onPressed: () => context.go('/guest'), child: const Text('Try as guest')),
                 ]),
               ],
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _AccountTypeCard extends StatelessWidget {
+  final bool selected;
+  final String title;
+  final String desc;
+  final VoidCallback onTap;
+
+  const _AccountTypeCard({
+    required this.selected,
+    required this.title,
+    required this.desc,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Ink(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.teal.withValues(alpha: 0.08) : Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: selected ? AppColors.teal : AppColors.border, width: selected ? 1.5 : 1),
+        ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            Expanded(child: Text(title, style: const TextStyle(fontWeight: FontWeight.w800))),
+            Icon(selected ? Icons.check_circle : Icons.circle_outlined, color: selected ? AppColors.teal : AppColors.muted, size: 20),
+          ]),
+          const SizedBox(height: 6),
+          Text(desc, style: TextStyle(fontSize: 12, color: AppColors.muted, fontWeight: FontWeight.w500, height: 1.35)),
+        ]),
       ),
     );
   }

@@ -6,7 +6,6 @@ import '../theme/app_theme.dart';
 import '../util/dates.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/error_view.dart';
-import 'staff_form_screen.dart';
 
 class WardHomeScreen extends StatefulWidget {
   final String wardId;
@@ -137,20 +136,11 @@ class _WardHomeScreenState extends State<WardHomeScreen> {
   }
 
   Future<void> _openStaffForm({Map<String, dynamic>? staff}) async {
-    final store = HospitalStore.instance;
-    final ward = store.wardById(widget.wardId);
-    final saved = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(
-        builder: (_) => StaffFormScreen(
-          hospitalId: _hid!,
-          departments: store.departments,
-          wards: store.wards,
-          staff: staff,
-          defaultDepartmentId: ward?['departmentId']?.toString() ?? store.departments.first['_id']?.toString(),
-          defaultWardId: widget.wardId,
-        ),
-      ),
-    );
+    final staffId = staff?['_id']?.toString();
+    final path = staffId != null && staffId.isNotEmpty
+        ? '/staff/${widget.wardId}?staffId=$staffId'
+        : '/staff/${widget.wardId}';
+    final saved = await context.push<bool>(path);
     if (saved == true) await _load();
   }
 

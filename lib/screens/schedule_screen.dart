@@ -6,6 +6,7 @@ import '../theme/app_theme.dart';
 import '../util/dates.dart';
 import '../util/roster_export.dart';
 import '../widgets/error_view.dart';
+import '../widgets/rules_sheet.dart';
 
 class ScheduleScreen extends StatefulWidget {
   final String scheduleId;
@@ -199,28 +200,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     }
   }
 
-  void _openRules() {
-    showModalBottomSheet<void>(
-      context: context,
-      builder: (ctx) => const SafeArea(
-        child: Padding(
-          padding: EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Rules', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
-              SizedBox(height: 12),
-              Text('People on leave are not on shifts.'),
-              Text('O / H are not work.'),
-              Text('In-charge and assistant work weekday mornings only, no nights.'),
-              Text('At least one senior or in-charge on Morning each day — not afternoon or night.'),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
+  void _openRules() => showRulesSheet(context);
 
   Future<void> _export(String format) async {
     try {
