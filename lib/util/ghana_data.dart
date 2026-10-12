@@ -1,3 +1,88 @@
+const hospitalTypes = [
+  'Teaching Hospital',
+  'Regional Hospital',
+  'District Hospital',
+  'Polyclinic',
+  'Health Centre',
+  'Clinic',
+  'Specialist Hospital',
+  'CHPS Compound',
+];
+
+const ghanaRegions = [
+  'Greater Accra',
+  'Ashanti',
+  'Western',
+  'Western North',
+  'Central',
+  'Eastern',
+  'Volta',
+  'Oti',
+  'Northern',
+  'North East',
+  'Savannah',
+  'Upper East',
+  'Upper West',
+  'Bono',
+  'Bono East',
+  'Ahafo',
+];
+
+class DepartmentTemplate {
+  final String name;
+  final String description;
+  const DepartmentTemplate(this.name, this.description);
+}
+
+const departmentTemplates = [
+  DepartmentTemplate('Accident & Emergency', '24/7 emergency care and trauma response'),
+  DepartmentTemplate('Medicine & Therapeutics', 'General internal medicine and adult inpatient care'),
+  DepartmentTemplate('Surgery', 'General and specialised surgical services'),
+  DepartmentTemplate('Obstetrics & Gynaecology', 'Women’s health, antenatal, and gynaecological care'),
+  DepartmentTemplate('Maternity', 'Labour, delivery, and postnatal ward'),
+  DepartmentTemplate('Child Health', 'Paediatrics and neonatal care'),
+  DepartmentTemplate('Intensive Care Unit', 'Critical and high-dependency care'),
+  DepartmentTemplate('Outpatient Department', 'Walk-in consultations and follow-up clinics'),
+  DepartmentTemplate('Pharmacy', 'Dispensing, drug management, and clinical pharmacy'),
+  DepartmentTemplate('Radiology', 'X-ray, ultrasound, CT, and imaging services'),
+  DepartmentTemplate('Pathology & Laboratory', 'Diagnostic lab and pathology services'),
+  DepartmentTemplate('Anaesthesia', 'Theatre and pain management support'),
+  DepartmentTemplate('Cardiology', 'Heart and cardiovascular care'),
+  DepartmentTemplate('Orthopaedics', 'Bone, joint, and trauma orthopaedic care'),
+  DepartmentTemplate('Eye Clinic', 'Ophthalmology and optometry services'),
+  DepartmentTemplate('ENT', 'Ear, nose, and throat care'),
+  DepartmentTemplate('Psychiatry', 'Mental health assessment and treatment'),
+  DepartmentTemplate('Physiotherapy', 'Rehabilitation and physical therapy'),
+  DepartmentTemplate('Dental', 'Dental and oral health services'),
+  DepartmentTemplate('Polyclinic', 'Family medicine and general practice'),
+];
+
+const wardPresets = [
+  'Male Medical Ward',
+  'Female Medical Ward',
+  'Male Surgical Ward',
+  'Female Surgical Ward',
+  'Paediatric Ward',
+  'Maternity Ward',
+  'Delivery Suite',
+  'Labour Ward',
+  'Gynaecology Ward',
+  'Orthopaedic Ward',
+  'ICU',
+  'NICU',
+  'PICU',
+  'HDU',
+  'A&E',
+  'OPD',
+  'Theatre',
+  'Recovery Ward',
+  'Isolation Ward',
+  'Psychiatric Ward',
+  'Eye Ward',
+  'ENT Ward',
+  'Burns Ward',
+];
+
 const staffCategories = [
   'Nurse',
   'Midwife',

@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../services/api_service.dart';
 import '../state/hospital_store.dart';
+import '../theme/app_theme.dart';
 import '../util/dates.dart';
+import '../util/roster_export.dart';
 import '../widgets/error_view.dart';
 
 class ScheduleScreen extends StatefulWidget {
@@ -220,6 +222,118 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     );
   }
 
+  Future<void> _export(String format) async {
+    try {
+      final wardId = _schedule['wardId']?.toString();
+      final ward = wardId != null ? HospitalStore.instance.wardById(wardId) : null;
+      final model = buildRosterExportModel(
+        schedule: _schedule,
+        hospital: _hospital,
+        ward: ward,
+        staff: _staff,
+        assignments: _assignments,
+        rosterSetup: _schedule['rosterSetup'] is Map
+            ? Map<String, dynamic>.from(_schedule['rosterSetup'] as Map)
+            : (ward?['rosterSetup'] is Map ? Map<String, dynamic>.from(ward!['rosterSetup'] as Map) : null),
+      );
+      if (format == 'csv') {
+        await shareRosterCsv(model);
+      } else if (format == 'xlsx') {
+        await shareRosterExcel(model);
+      } else {
+        await shareRosterPdf(model);
+      }
+      if (mounted) setState(() => _toast = 'Shared $format export');
+    } catch (e) {
+      if (mounted) setState(() => _toast = 'Export failed: $e');
+    }
+  }
+
+  void _openExport() {
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const ListTile(title: Text('Export roster', style: TextStyle(fontWeight: FontWeight.w800))),
+            ListTile(
+              leading: const Icon(Icons.picture_as_pdf_outlined),
+              title: const Text('PDF'),
+              onTap: () {
+                Navigator.pop(ctx);
+                _export('pdf');
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.table_chart_outlined),
+              title: const Text('Excel (.xlsx)'),
+              onTap: () {
+                Navigator.pop(ctx);
+                _export('xlsx');
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.description_outlined),
+              title: const Text('CSV'),
+              onTap: () {
+                Navigator.pop(ctx);
+                _export('csv');
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _openIssues() {
+    final groups = _groupIssues();
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.55,
+        minChildSize: 0.3,
+        maxChildSize: 0.9,
+        builder: (_, controller) => SafeArea(
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+                child: Row(children: [
+                  const Expanded(child: Text('Validation', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800))),
+                  TextButton(onPressed: () { Navigator.pop(ctx); _validate(); }, child: const Text('Re-check')),
+                ]),
+              ),
+              if (groups.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.all(24),
+                  child: Text('No issues found. Roster looks good.', style: TextStyle(fontWeight: FontWeight.w600)),
+                )
+              else
+                Expanded(
+                  child: ListView.builder(
+                    controller: controller,
+                    itemCount: groups.length,
+                    itemBuilder: (_, i) {
+                      final g = groups[i];
+                      return ListTile(
+                        leading: Icon(Icons.warning_amber_rounded, color: Colors.orange[800]),
+                        title: Text(g.title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                        subtitle: g.detail == null ? null : Text(g.detail!, style: const TextStyle(fontSize: 12)),
+                      );
+                    },
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading) {
@@ -241,6 +355,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       appBar: AppBar(
         title: Text(_schedule['name']?.toString() ?? 'Roster'),
         actions: [
+          IconButton(icon: const Icon(Icons.ios_share_outlined), tooltip: 'Export', onPressed: _openExport),
           IconButton(icon: const Icon(Icons.rule), tooltip: 'Rules', onPressed: _openRules),
           if (_canWrite)
             IconButton(icon: const Icon(Icons.tune), tooltip: 'Settings', onPressed: _openSettings),
@@ -281,18 +396,24 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
               ]),
             ),
           if (groups.isNotEmpty)
-            SizedBox(
-              height: 120,
-              child: ListView(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                children: [
-                  for (final g in groups)
-                    ListTile(
-                      dense: true,
-                      title: Text(g.title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
-                      subtitle: g.detail == null ? null : Text(g.detail!, style: const TextStyle(fontSize: 12)),
+            Material(
+              color: Colors.orange.shade50,
+              child: InkWell(
+                onTap: _openIssues,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  child: Row(children: [
+                    Icon(Icons.warning_amber_rounded, color: Colors.orange[800], size: 20),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        '${groups.length} validation issue${groups.length == 1 ? '' : 's'} — tap to review',
+                        style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: Colors.orange[900]),
+                      ),
                     ),
-                ],
+                    const Icon(Icons.chevron_right, size: 20),
+                  ]),
+                ),
               ),
             ),
           Expanded(
@@ -367,6 +488,8 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         return 'N';
       case 'SOD':
         return 'SOD';
+      case 'Office':
+        return 'OFC';
       default:
         return name.isEmpty ? '' : name[0];
     }
@@ -375,11 +498,15 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   Color _shiftColor(String name) {
     switch (name) {
       case 'Morning':
-        return const Color(0xFF006B3F);
+        return AppColors.green;
       case 'Afternoon':
         return Colors.orange[800]!;
       case 'Night':
         return Colors.indigo;
+      case 'Office':
+        return AppColors.teal;
+      case 'SOD':
+        return const Color(0xFF006B6B);
       default:
         return Colors.purple;
     }

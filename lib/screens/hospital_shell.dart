@@ -79,10 +79,28 @@ class _HospitalShellState extends State<HospitalShell> {
           title: const Text('MedRoster'),
           actions: [IconButton(icon: const Icon(Icons.logout), onPressed: _signOut)],
         ),
-        body: const Center(
+        body: Center(
           child: Padding(
-            padding: EdgeInsets.all(32),
-            child: Text(ApiService.individualAppMessage, textAlign: TextAlign.center),
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  ApiService.individualAppMessage,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontWeight: FontWeight.w600, height: 1.4),
+                ),
+                const SizedBox(height: 20),
+                FilledButton(
+                  onPressed: () => context.go('/auth/join'),
+                  child: const Text('Join a hospital'),
+                ),
+                TextButton(
+                  onPressed: () => context.go('/auth/register'),
+                  child: const Text('Register a hospital'),
+                ),
+              ],
+            ),
           ),
         ),
       );

@@ -13,7 +13,8 @@ Signs in with **Firebase Auth** and talks to the MedRoster API for hospitals, wa
 - **Flutter** (Dart 3.9+)
 - **Firebase Auth** + `firebase_core`
 - **go_router** for navigation
-- **http** + secure storage for API calls with ID tokens
+- **http** + Firebase ID tokens for API calls
+- **google_sign_in**, **google_fonts**, **pdf** / **excel** / **share_plus** for auth + export
 
 ---
 
@@ -50,15 +51,16 @@ Signs in with **Firebase Auth** and talks to the MedRoster API for hospitals, wa
 
 | Route | Screen |
 |-------|--------|
-| `/auth/login` | Sign in |
-| `/auth/register` | Register admin + hospital |
+| `/auth/login` | Sign in (email, Google, phone OTP) |
+| `/auth/register` | Register hospital admin (email, Google, phone) |
+| `/auth/join` | Join hospital via join code |
 | `/` | Hospital shell (redirects to a ward) |
 | `/ward/:wardId` | Ward home |
-| `/import/:wardId` | Import roster |
-| `/schedule/:schedId` | Roster calendar |
-| `/wards` | Add / edit wards |
+| `/import/:wardId` | Import roster (CSV / file / photo + legend setup) |
+| `/schedule/:schedId` | Roster calendar (assign, generate, validate, export) |
+| `/wards` | Add / edit departments & wards |
 | `/settings` | Join code |
-| `/setup` | First department + ward |
+| `/setup` | Department template picker |
 
 Unauthenticated users are redirected to login.
 

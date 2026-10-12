@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../services/api_service.dart';
 import '../state/hospital_store.dart';
+import '../theme/app_theme.dart';
 import '../util/dates.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/error_view.dart';
@@ -176,16 +177,19 @@ class _WardHomeScreenState extends State<WardHomeScreen> {
         children: [
           Text(
             (dept?['name'] ?? 'Department').toString().toUpperCase(),
-            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 1.1, color: Colors.grey),
+            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1.2, color: AppColors.teal),
           ),
           Text(ward['name']?.toString() ?? 'Ward', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800)),
-          Text('${people.length} ${people.length == 1 ? 'staff member' : 'staff'} on this ward.'),
+          Text(
+            '${people.length} ${people.length == 1 ? 'staff member' : 'staff'} on this ward.',
+            style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w500),
+          ),
           if (latest != null)
             Padding(
               padding: const EdgeInsets.only(top: 6),
               child: Text(
                 'Current cycle: ${formatRange(latest['startDate'], latest['endDate'])}',
-                style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                style: const TextStyle(color: AppColors.muted, fontSize: 13, fontWeight: FontWeight.w500),
               ),
             ),
           if (_error != null)

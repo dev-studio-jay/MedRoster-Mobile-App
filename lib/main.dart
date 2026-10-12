@@ -5,8 +5,10 @@ import 'firebase_options.dart';
 import 'services/auth_service.dart';
 import 'services/api_service.dart';
 import 'state/hospital_store.dart';
+import 'theme/app_theme.dart';
 import 'screens/login_screen.dart';
 import 'screens/register_screen.dart';
+import 'screens/join_screen.dart';
 import 'screens/hospital_shell.dart';
 import 'screens/ward_home_screen.dart';
 import 'screens/wards_screen.dart';
@@ -25,7 +27,10 @@ final _router = GoRouter(
   refreshListenable: AuthService.instance.authListenable,
   redirect: (context, state) {
     final loggedIn = AuthService.instance.currentUser != null;
-    final onAuth = state.matchedLocation.startsWith('/auth');
+    final loc = state.matchedLocation;
+    final onAuth = loc.startsWith('/auth');
+    final onJoin = loc == '/auth/join';
+
     if (!loggedIn && !onAuth) {
       ApiService.instance.clearProfile();
       HospitalStore.instance.hospital = null;
@@ -33,12 +38,14 @@ final _router = GoRouter(
       HospitalStore.instance.loading = false;
       return '/auth/login';
     }
-    if (loggedIn && onAuth) return '/';
+    // Allow join while logged out; bounce other auth routes when signed in
+    if (loggedIn && onAuth && !onJoin) return '/';
     return null;
   },
   routes: [
     GoRoute(path: '/auth/login', builder: (_, __) => const LoginScreen()),
     GoRoute(path: '/auth/register', builder: (_, __) => const RegisterScreen()),
+    GoRoute(path: '/auth/join', builder: (_, __) => const JoinScreen()),
     GoRoute(
       path: '/schedule/:schedId',
       builder: (_, state) => ScheduleScreen(scheduleId: state.pathParameters['schedId']!),
@@ -71,39 +78,8 @@ class MedRosterApp extends StatelessWidget {
     return MaterialApp.router(
       title: 'MedRoster',
       debugShowCheckedModeBanner: false,
-      theme: _buildTheme(),
+      theme: buildAppTheme(),
       routerConfig: _router,
-    );
-  }
-
-  ThemeData _buildTheme() {
-    const ghsGreen = Color(0xFF006B3F);
-    const ghsGold = Color(0xFFFCD116);
-    return ThemeData(
-      useMaterial3: true,
-      colorScheme: ColorScheme.fromSeed(
-        seedColor: ghsGreen,
-        primary: ghsGreen,
-        secondary: ghsGold,
-        brightness: Brightness.light,
-      ),
-      appBarTheme: const AppBarTheme(
-        backgroundColor: ghsGreen,
-        foregroundColor: Colors.white,
-        elevation: 0,
-      ),
-      inputDecorationTheme: InputDecorationTheme(
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      ),
-      filledButtonTheme: FilledButtonThemeData(
-        style: FilledButton.styleFrom(
-          backgroundColor: ghsGreen,
-          foregroundColor: Colors.white,
-          minimumSize: const Size(64, 48),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        ),
-      ),
     );
   }
 }

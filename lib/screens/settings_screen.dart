@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:go_router/go_router.dart';
 import '../services/api_service.dart';
 import '../state/hospital_store.dart';
+import '../theme/app_theme.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -78,11 +81,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     child: const Text('Edit'),
                   ),
               ]),
-              const Text('Staff use this code to join and view schedules.'),
+              Text(
+                'Staff use this code in Join hospital to view schedules (read-only).',
+                style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w500),
+              ),
               const SizedBox(height: 12),
-              if (!_editing)
-                Text(code, style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w800, letterSpacing: 4))
-              else ...[
+              if (!_editing) ...[
+                SelectableText(code, style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w800, letterSpacing: 4)),
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    await Clipboard.setData(ClipboardData(text: code));
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Join code copied')));
+                    }
+                  },
+                  icon: const Icon(Icons.copy, size: 18),
+                  label: const Text('Copy code'),
+                ),
+              ] else ...[
                 TextField(
                   controller: _codeCtrl,
                   textCapitalization: TextCapitalization.characters,
@@ -104,10 +121,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   padding: const EdgeInsets.only(top: 8),
                   child: Text(_success!, style: const TextStyle(color: Colors.green)),
                 ),
-              const SizedBox(height: 8),
-              const Text(
-                'Share this code with staff so they can join via Join hospital and view schedules (read-only).',
-                style: TextStyle(fontSize: 12, color: Colors.black54),
+              const SizedBox(height: 12),
+              TextButton(
+                onPressed: () => context.push('/auth/join'),
+                child: const Text('Open Join hospital screen'),
               ),
             ]),
           ),

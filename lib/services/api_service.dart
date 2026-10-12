@@ -89,6 +89,20 @@ class ApiService {
     return _parse(res);
   }
 
+  /// Authenticated binary download (e.g. CSV template).
+  Future<List<int>> getBytes(String path, {Duration timeout = const Duration(seconds: 30)}) async {
+    final headers = await _headers();
+    headers.remove('Content-Type');
+    final res = await http.get(Uri.parse('$_base$path'), headers: headers).timeout(timeout);
+    if (res.statusCode >= 200 && res.statusCode < 300) return res.bodyBytes;
+    dynamic body;
+    try {
+      body = res.body.isNotEmpty ? jsonDecode(res.body) : null;
+    } catch (_) {}
+    final map = body is Map ? Map<String, dynamic>.from(body) : null;
+    throw ApiException(map?['error']?.toString() ?? res.reasonPhrase ?? 'Download failed', res.statusCode, map);
+  }
+
   List<Map<String, dynamic>> asMaps(dynamic data) {
     if (data is! List) return [];
     return data.map((e) => Map<String, dynamic>.from(e as Map)).toList();

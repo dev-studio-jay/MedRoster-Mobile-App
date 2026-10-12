@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../state/hospital_store.dart';
+import '../theme/app_theme.dart';
+import '../util/ghana_data.dart';
 import '../util/org_units.dart';
 import '../widgets/error_view.dart';
 
@@ -158,7 +160,24 @@ class _WardsScreenState extends State<WardsScreen> {
                           )
                         : null,
                   ),
-                if (_canWrite)
+                if (_canWrite) ...[
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      for (final preset in wardPresets.take(8))
+                        ActionChip(
+                          label: Text(preset, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+                          onPressed: () {
+                            _wardCtrl(dept['_id'].toString()).text = preset;
+                            _addWard(dept['_id'].toString());
+                          },
+                          backgroundColor: AppColors.surface,
+                          side: const BorderSide(color: AppColors.border),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
                   Row(children: [
                     Expanded(
                       child: TextField(
@@ -168,6 +187,7 @@ class _WardsScreenState extends State<WardsScreen> {
                     ),
                     IconButton(onPressed: () => _addWard(dept['_id'].toString()), icon: const Icon(Icons.add)),
                   ]),
+                ],
               ]),
             ),
           ),
