@@ -11,6 +11,8 @@ import '../services/api_service.dart';
 import '../state/hospital_store.dart';
 import '../theme/app_theme.dart';
 import '../util/roster_setup.dart';
+import '../util/rule_modes.dart';
+import '../widgets/rule_modes_panel.dart';
 
 class ImportRosterScreen extends StatefulWidget {
   final String wardId;
@@ -35,6 +37,7 @@ class _ImportRosterScreenState extends State<ImportRosterScreen> {
   bool _leaveStayOff = true;
   bool _offAndHolidayStayOff = true;
   bool _keepGridAsIs = true;
+  Map<String, String> _ruleModes = getDefaultRuleModes();
 
   String? get _hid => HospitalStore.instance.hospitalId ?? ApiService.instance.hospitalId;
   Map<String, dynamic>? get _ward => HospitalStore.instance.wardById(widget.wardId);
@@ -231,6 +234,9 @@ class _ImportRosterScreenState extends State<ImportRosterScreen> {
       Map<String, dynamic> data;
       if (_preview!['source'] == 'roster') {
         final rosterSetup = _setupDraft != null ? buildRosterSetupPayload(_setupDraft!) : null;
+        await ApiService.instance.patch('/api/hospitals/$hid', {
+          'settings': {'ruleModes': normalizeRuleModes(_ruleModes)},
+        });
         data = Map<String, dynamic>.from(
           await ApiService.instance.post(
             '/api/hospitals/$hid/staff/import-roster',
@@ -374,6 +380,11 @@ class _ImportRosterScreenState extends State<ImportRosterScreen> {
               subtitle: const Text('Do not auto-generate over what we just read.'),
               value: _keepGridAsIs,
               onChanged: (v) => setState(() => _keepGridAsIs = v),
+            ),
+            const SizedBox(height: 12),
+            RuleModesPanel(
+              modes: _ruleModes,
+              onChanged: (m) => setState(() => _ruleModes = m),
             ),
           ],
           if (_step == 'done' && _result != null)
@@ -584,7 +595,7 @@ class _ImportRosterScreenState extends State<ImportRosterScreen> {
       case 'review':
         return 'Tick who to keep. Nothing is saved yet.';
       case 'rules':
-        return 'How should we read the file? Core roster rules stay on.';
+        return 'Import preferences, then choose Flexible vs Hardened for on-ground guidelines.';
       case 'done':
         return 'Staff are on this ward. Open the roster when you want to edit shifts.';
       default:

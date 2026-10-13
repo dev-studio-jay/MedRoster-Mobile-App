@@ -1,5 +1,6 @@
 import 'dates.dart';
 import 'roster_setup.dart';
+import 'rule_modes.dart';
 
 const defaultShiftTypes = [
   {'name': 'Morning', 'color': 'morning', 'startTime': '08:00', 'endTime': '14:00'},
@@ -250,6 +251,8 @@ List<Map<String, dynamic>> generateSandboxAssignments({
   List holidays = const [],
   Map? rosterSetup,
   bool replace = false,
+  Map? settings,
+  Map? ruleModes,
 }) {
   final types = shiftTypes ?? sandboxShiftTypes();
   final base = replace
@@ -265,9 +268,23 @@ List<Map<String, dynamic>> generateSandboxAssignments({
   );
   if (scanned.slots.isEmpty) return base;
 
+  final resolved = <String, dynamic>{
+    ...(settings is Map ? Map<String, dynamic>.from(settings) : <String, dynamic>{}),
+    'ruleModes': normalizeRuleModes(ruleModes ?? settings?['ruleModes']),
+    'maxConsecutiveDays': settings?['maxConsecutiveDays'] ?? 6,
+    'maxConsecutiveNights': settings?['maxConsecutiveNights'] ?? 3,
+  };
+  final maxConsecutive = (resolved['maxConsecutiveDays'] as num?)?.toInt() ?? 6;
+  final maxNights = (resolved['maxConsecutiveNights'] as num?)?.toInt() ?? 3;
+  final hardenDays = isRuleHard(resolved, 'consecutiveDays');
+  final hardenNights = isRuleHard(resolved, 'consecutiveNights');
+
   final legend = rosterSetup is Map && rosterSetup['legend'] is List ? List.from(rosterSetup['legend'] as List) : <dynamic>[];
   final next = [...base];
   final counts = <String, int>{for (final s in staff.whereType<Map>()) s['_id'].toString(): 0};
+  final consecutiveTracker = <String, int>{for (final s in staff.whereType<Map>()) s['_id'].toString(): 0};
+  final consecutiveNightTracker = <String, int>{for (final s in staff.whereType<Map>()) s['_id'].toString(): 0};
+  final lastWorkedDate = <String, DateTime>{};
   for (final a in next) {
     final id = a['staffId'].toString();
     counts[id] = (counts[id] ?? 0) + 1;
@@ -279,11 +296,21 @@ List<Map<String, dynamic>> generateSandboxAssignments({
     final dk = slot['date'].toString();
     byDay.putIfAbsent(dk, () => []).add(slot);
   }
+  final sortedDays = byDay.keys.toList()..sort();
 
-  for (final entry in byDay.entries) {
-    final dk = entry.key;
+  for (final dk in sortedDays) {
+    final daySlots = byDay[dk]!;
+    final day = parseDate(dk)!;
+    for (final entry in [...lastWorkedDate.entries]) {
+      final diff = day.difference(entry.value).inDays;
+      if (diff > 1) {
+        consecutiveTracker[entry.key] = 0;
+        consecutiveNightTracker[entry.key] = 0;
+      }
+    }
+
     final taken = _staffTakenOnDay(next, dk);
-    final ordered = [...entry.value]..sort((a, b) {
+    final ordered = [...daySlots]..sort((a, b) {
         final an = (a['shift'] as Map)['name'];
         final bn = (b['shift'] as Map)['name'];
         if (an == 'Morning' && bn != 'Morning') return -1;
@@ -294,13 +321,26 @@ List<Map<String, dynamic>> generateSandboxAssignments({
     for (final slot in ordered) {
       final shift = Map<String, dynamic>.from(slot['shift'] as Map);
       if (_dayHasCover(next, dk, shift['name'].toString())) continue;
+      final isNight = shift['name'] == 'Night';
       var candidates = (slot['candidates'] as List)
           .whereType<Map>()
           .where((s) => !taken.contains(s['_id'].toString()))
-          .where((s) => _canAssignCover(s, parseDate(dk)!, shift, holidays))
+          .where((s) => _canAssignCover(s, day, shift, holidays))
           .toList();
+      if (hardenDays) {
+        candidates = candidates.where((s) => (consecutiveTracker[s['_id'].toString()] ?? 0) < maxConsecutive).toList();
+      }
+      if (hardenNights && isNight) {
+        candidates = candidates.where((s) => (consecutiveNightTracker[s['_id'].toString()] ?? 0) < maxNights).toList();
+      }
       if (candidates.isEmpty) continue;
-      candidates.sort((a, b) => (counts[a['_id'].toString()] ?? 0).compareTo(counts[b['_id'].toString()] ?? 0));
+      candidates.sort((a, b) {
+        final soft = !hardenDays
+            ? (consecutiveTracker[a['_id'].toString()] ?? 0).compareTo(consecutiveTracker[b['_id'].toString()] ?? 0)
+            : 0;
+        if (soft != 0) return soft;
+        return (counts[a['_id'].toString()] ?? 0).compareTo(counts[b['_id'].toString()] ?? 0);
+      });
       var pick = candidates.first;
       if (seniors.isNotEmpty) {
         final seniorPick = candidates.where((s) => seniors.any((x) => x['_id'].toString() == s['_id'].toString()));
@@ -324,6 +364,13 @@ List<Map<String, dynamic>> generateSandboxAssignments({
       });
       taken.add(sid);
       counts[sid] = (counts[sid] ?? 0) + 1;
+      consecutiveTracker[sid] = (consecutiveTracker[sid] ?? 0) + 1;
+      if (isNight) {
+        consecutiveNightTracker[sid] = (consecutiveNightTracker[sid] ?? 0) + 1;
+      } else {
+        consecutiveNightTracker[sid] = 0;
+      }
+      lastWorkedDate[sid] = day;
     }
   }
   return next;

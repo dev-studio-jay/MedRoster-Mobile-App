@@ -9,7 +9,9 @@ import 'package:image_picker/image_picker.dart';
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
 import '../util/roster_setup.dart';
+import '../util/rule_modes.dart';
 import '../util/sandbox_roster.dart';
+import '../widgets/rule_modes_panel.dart';
 
 /// Import for guest / individual sandbox — returns merged staff + assignments + rosterSetup.
 class SandboxImportScreen extends StatefulWidget {
@@ -33,6 +35,7 @@ class _SandboxImportScreenState extends State<SandboxImportScreen> {
   Map<String, dynamic>? _rawPreview;
   Map<String, dynamic>? _preview;
   Map<String, dynamic>? _setupDraft;
+  Map<String, String> _ruleModes = getDefaultRuleModes();
 
   String get _base => widget.mode == 'guest' ? '/api/guest/staff' : '/api/me/staff';
 
@@ -172,6 +175,7 @@ class _SandboxImportScreenState extends State<SandboxImportScreen> {
       'rosterSetup': rosterSetup,
       'days': _preview?['days'],
       'title': _preview?['title'],
+      'ruleModes': normalizeRuleModes(_ruleModes),
     });
   }
 
@@ -255,6 +259,11 @@ class _SandboxImportScreenState extends State<SandboxImportScreen> {
                 subtitle: Text(_previewStaff[i]['rank']?.toString() ?? ''),
               ),
           ],
+          if (_step == 'rules')
+            RuleModesPanel(
+              modes: _ruleModes,
+              onChanged: (m) => setState(() => _ruleModes = m),
+            ),
           if (_error != null) ...[
             const SizedBox(height: 12),
             Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error, fontWeight: FontWeight.w600)),
@@ -266,7 +275,9 @@ class _SandboxImportScreenState extends State<SandboxImportScreen> {
                 child: OutlinedButton(
                   onPressed: () => setState(() {
                     _error = null;
-                    if (_step == 'review') {
+                    if (_step == 'rules') {
+                      _step = 'review';
+                    } else if (_step == 'review') {
                       _step = (_rawPreview?['source'] == 'roster' && _legendRows.isNotEmpty) ? 'setup' : 'upload';
                     } else if (_step == 'setup') {
                       _step = 'upload';
@@ -291,6 +302,21 @@ class _SandboxImportScreenState extends State<SandboxImportScreen> {
       return FilledButton(onPressed: _loading ? null : _readFile, child: Text(_loading ? 'Reading…' : 'Read file'));
     }
     if (_step == 'setup') return FilledButton(onPressed: _applySetup, child: const Text('Apply legend'));
+    if (_step == 'review') {
+      return FilledButton(
+        onPressed: () {
+          if (_previewStaff.where((s) => s['selected'] != false).isEmpty) {
+            setState(() => _error = 'Select at least one staff row');
+            return;
+          }
+          setState(() {
+            _error = null;
+            _step = 'rules';
+          });
+        },
+        child: Text('Continue with ${_previewStaff.where((s) => s['selected'] != false).length}'),
+      );
+    }
     return FilledButton(onPressed: _finish, child: Text('Import ${_previewStaff.where((s) => s['selected'] != false).length}'));
   }
 
@@ -304,6 +330,8 @@ class _SandboxImportScreenState extends State<SandboxImportScreen> {
         return 'Map file codes to shifts.';
       case 'review':
         return 'Tick who to keep.';
+      case 'rules':
+        return 'Choose Flexible vs Hardened for on-ground guidelines.';
       default:
         return '';
     }

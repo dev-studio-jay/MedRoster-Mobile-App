@@ -5,7 +5,9 @@ import '../state/hospital_store.dart';
 import '../theme/app_theme.dart';
 import '../util/dates.dart';
 import '../util/roster_export.dart';
+import '../util/rule_modes.dart';
 import '../widgets/error_view.dart';
+import '../widgets/rule_modes_panel.dart';
 import '../widgets/rules_sheet.dart';
 
 class ScheduleScreen extends StatefulWidget {
@@ -417,23 +419,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                         ),
                       ),
                   ],
-                  rows: [
-                    for (final staff in _staff)
-                      DataRow(cells: [
-                        DataCell(SizedBox(
-                          width: 110,
-                          child: Text(
-                            '${staff['firstName'] ?? ''} ${staff['lastName'] ?? ''}',
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        )),
-                        for (final d in days)
-                          DataCell(
-                            _cell(staff, d, lookup['${staff['_id']}_${dateKey(d)}']),
-                            onTap: () => _pickShift(staff, d),
-                          ),
-                      ]),
-                  ],
+                  rows: _staffDataRows(days, lookup),
                 ),
               ),
             ),
@@ -445,6 +431,61 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         ],
       ),
     );
+  }
+
+  List<DataRow> _staffDataRows(List<DateTime> days, Map<String, Map<String, dynamic>> lookup) {
+    final parts = partitionStaffForRoster(_staff, _schedule['startDate'], _schedule['endDate']);
+    final rows = <DataRow>[];
+
+    DataRow personRow(Map<String, dynamic> staff) {
+      return DataRow(cells: [
+        DataCell(SizedBox(
+          width: 110,
+          child: Text(
+            '${staff['firstName'] ?? ''} ${staff['lastName'] ?? ''}',
+            overflow: TextOverflow.ellipsis,
+          ),
+        )),
+        for (final d in days)
+          DataCell(
+            _cell(staff, d, lookup['${staff['_id']}_${dateKey(d)}']),
+            onTap: () => _pickShift(staff, d),
+          ),
+      ]);
+    }
+
+    DataRow spacerLabel(String label) {
+      return DataRow(
+        color: WidgetStatePropertyAll(AppColors.surface),
+        cells: [
+          DataCell(Text(label, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 11, color: AppColors.muted))),
+          for (final _ in days) const DataCell(SizedBox.shrink()),
+        ],
+      );
+    }
+
+    for (final s in parts.regular) {
+      rows.add(personRow(s));
+    }
+    if (parts.rotation.isNotEmpty) {
+      rows.add(spacerLabel('ROTATION'));
+      for (final s in parts.rotation) {
+        rows.add(personRow(s));
+      }
+    }
+    if (parts.leave.isNotEmpty) {
+      rows.add(DataRow(
+        cells: [
+          const DataCell(SizedBox(height: 8)),
+          for (final _ in days) const DataCell(SizedBox.shrink()),
+        ],
+      ));
+      rows.add(spacerLabel('ON LEAVE'));
+      for (final s in parts.leave) {
+        rows.add(personRow(s));
+      }
+    }
+    return rows;
   }
 
   Widget _cell(Map<String, dynamic> staff, DateTime date, Map<String, dynamic>? assignment) {
@@ -545,19 +586,19 @@ class _SettingsDialogState extends State<_SettingsDialog> {
   late int _nights;
   late int _seniors;
   late int _hours;
-  late bool _warn;
+  late Map<String, String> _ruleModes;
 
   @override
   void initState() {
     super.initState();
     _days = (widget.settings['maxConsecutiveDays'] as num?)?.toInt() ?? 6;
     _nights = (widget.settings['maxConsecutiveNights'] as num?)?.toInt() ?? 3;
-    _seniors = (widget.settings['minSeniorStaffPerDay'] as num?)?.toInt() ?? 1;
-    if (_seniors < 1) _seniors = 1;
+    _seniors = (widget.settings['minSeniorStaffPerShift'] as num?)?.toInt() ??
+        (widget.settings['minSeniorStaffPerDay'] as num?)?.toInt() ??
+        1;
+    if (_seniors < 0) _seniors = 0;
     _hours = (widget.settings['maxHoursPerWeek'] as num?)?.toInt() ?? 48;
-    _warn = widget.settings['validationRules'] is Map
-        ? (widget.settings['validationRules'] as Map)['warnConsecutiveShifts'] != false
-        : true;
+    _ruleModes = normalizeRuleModes(widget.settings['ruleModes']);
   }
 
   @override
@@ -567,17 +608,17 @@ class _SettingsDialogState extends State<_SettingsDialog> {
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Caps and hours. Leave, role, and morning senior cover stay on.'),
+            const Text('Caps and hours. Leave and personal restrictions stay hard.'),
             _numField('Max consecutive days', _days, 1, 14, (v) => _days = v),
             _numField('Max consecutive nights', _nights, 1, 7, (v) => _nights = v),
-            _numField('Min seniors on Morning', _seniors, 1, 20, (v) => _seniors = v),
+            _numField('Min seniors per shift', _seniors, 0, 20, (v) => _seniors = v),
             _numField('Max hours per week', _hours, 20, 80, (v) => _hours = v),
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('Warn on consecutive shifts'),
-              value: _warn,
-              onChanged: (v) => setState(() => _warn = v),
+            const SizedBox(height: 12),
+            RuleModesPanel(
+              modes: _ruleModes,
+              onChanged: (m) => setState(() => _ruleModes = m),
             ),
           ],
         ),
@@ -588,13 +629,15 @@ class _SettingsDialogState extends State<_SettingsDialog> {
           onPressed: () => Navigator.pop(context, {
             'maxConsecutiveDays': _days,
             'maxConsecutiveNights': _nights,
-            'minSeniorStaffPerDay': _seniors < 1 ? 1 : _seniors,
+            'minSeniorStaffPerDay': _seniors,
+            'minSeniorStaffPerShift': _seniors,
             'maxHoursPerWeek': _hours,
+            'ruleModes': normalizeRuleModes(_ruleModes),
             'validationRules': {
               'enforceLeaveConflicts': true,
               'enforceRoleShiftRestrictions': true,
               'enforceSupervisoryCoverage': true,
-              'warnConsecutiveShifts': _warn,
+              'warnConsecutiveShifts': true,
             },
           }),
           child: const Text('Save'),

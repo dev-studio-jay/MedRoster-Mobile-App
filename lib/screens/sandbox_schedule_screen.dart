@@ -6,7 +6,9 @@ import '../util/dates.dart';
 import '../util/ghana_data.dart';
 import '../util/roster_export.dart';
 import '../util/roster_setup.dart';
+import '../util/rule_modes.dart';
 import '../util/sandbox_roster.dart';
+import '../widgets/rule_modes_panel.dart';
 import '../widgets/rules_sheet.dart';
 
 /// Shared guest / individual roster editor (port of SandboxScheduleShell).
@@ -105,6 +107,7 @@ class _SandboxScheduleScreenState extends State<SandboxScheduleScreen> {
       'staff': mergedStaff,
       'assignments': byKey.values.toList(),
       if (result['rosterSetup'] != null) 'rosterSetup': result['rosterSetup'],
+      if (result['ruleModes'] != null) 'ruleModes': normalizeRuleModes(result['ruleModes']),
     });
     setState(() => _toast = 'Imported ${incoming.length} staff');
   }
@@ -211,6 +214,24 @@ class _SandboxScheduleScreenState extends State<SandboxScheduleScreen> {
   }
 
   Future<void> _generate() async {
+    Map? modes = _schedule['ruleModes'] is Map ? _schedule['ruleModes'] as Map : null;
+    if (modes == null) {
+      final chosen = await _promptRuleModes(pendingGenerate: true);
+      if (chosen == null || !mounted) return;
+      modes = chosen;
+      _patch({'ruleModes': modes});
+    }
+    await _runGenerate(modes);
+  }
+
+  Future<void> _editRuleModes() async {
+    final chosen = await _promptRuleModes();
+    if (chosen == null || !mounted) return;
+    _patch({'ruleModes': chosen});
+    setState(() => _toast = 'Rule flexibility saved');
+  }
+
+  Future<void> _runGenerate(Map? modes) async {
     setState(() => _generating = true);
     try {
       final next = generateSandboxAssignments(
@@ -220,6 +241,8 @@ class _SandboxScheduleScreenState extends State<SandboxScheduleScreen> {
         existing: _assignments,
         holidays: _schedule['holidays'] as List? ?? [],
         rosterSetup: _schedule['rosterSetup'] is Map ? _schedule['rosterSetup'] as Map : null,
+        settings: _schedule['settings'] is Map ? _schedule['settings'] as Map : null,
+        ruleModes: modes,
       );
       final added = next.length - _assignments.length;
       _patch({'assignments': next});
@@ -227,6 +250,52 @@ class _SandboxScheduleScreenState extends State<SandboxScheduleScreen> {
     } finally {
       if (mounted) setState(() => _generating = false);
     }
+  }
+
+  Future<Map<String, String>?> _promptRuleModes({bool pendingGenerate = false}) async {
+    var draft = normalizeRuleModes(_schedule['ruleModes']);
+    return showModalBottomSheet<Map<String, String>>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setLocal) {
+            return SafeArea(
+              child: Padding(
+                padding: EdgeInsets.only(
+                  left: 16,
+                  right: 16,
+                  top: 8,
+                  bottom: MediaQuery.of(ctx).viewInsets.bottom + 16,
+                ),
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        pendingGenerate ? 'Before you generate' : 'Rule flexibility',
+                        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
+                      ),
+                      const SizedBox(height: 12),
+                      RuleModesPanel(
+                        modes: draft,
+                        onChanged: (m) => setLocal(() => draft = m),
+                      ),
+                      const SizedBox(height: 12),
+                      FilledButton(
+                        onPressed: () => Navigator.pop(ctx, draft),
+                        child: Text(pendingGenerate ? 'Save & generate' : 'Save'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   void _openExport() {
@@ -305,6 +374,7 @@ class _SandboxScheduleScreenState extends State<SandboxScheduleScreen> {
               child: Center(child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))),
             ),
           IconButton(icon: const Icon(Icons.rule), tooltip: 'Rules', onPressed: () => showRulesSheet(context)),
+          IconButton(icon: const Icon(Icons.tune), tooltip: 'Rule flexibility', onPressed: _editRuleModes),
           if (widget.onExport != null)
             IconButton(
               icon: widget.exporting
@@ -428,20 +498,7 @@ class _SandboxScheduleScreenState extends State<SandboxScheduleScreen> {
                               ),
                             ),
                         ],
-                        rows: [
-                          for (final person in _staff)
-                            DataRow(cells: [
-                              DataCell(SizedBox(
-                                width: 110,
-                                child: Text('${person['firstName'] ?? ''} ${person['lastName'] ?? ''}', overflow: TextOverflow.ellipsis),
-                              )),
-                              for (final d in days)
-                                DataCell(
-                                  _cell(person, d, lookup['${person['_id']}_${dateKey(d)}']),
-                                  onTap: () => _pickShift(person, d),
-                                ),
-                            ]),
-                        ],
+                        rows: _staffDataRows(days, lookup),
                       ),
                     ),
                   ),
@@ -450,6 +507,58 @@ class _SandboxScheduleScreenState extends State<SandboxScheduleScreen> {
         ],
       ),
     );
+  }
+
+  List<DataRow> _staffDataRows(List<DateTime> days, Map<String, Map> lookup) {
+    final parts = partitionStaffForRoster(_staff, _schedule['startDate'], _schedule['endDate']);
+    final rows = <DataRow>[];
+
+    DataRow personRow(Map<String, dynamic> person) {
+      return DataRow(cells: [
+        DataCell(SizedBox(
+          width: 110,
+          child: Text('${person['firstName'] ?? ''} ${person['lastName'] ?? ''}', overflow: TextOverflow.ellipsis),
+        )),
+        for (final d in days)
+          DataCell(
+            _cell(person, d, lookup['${person['_id']}_${dateKey(d)}']),
+            onTap: () => _pickShift(person, d),
+          ),
+      ]);
+    }
+
+    DataRow spacerLabel(String label) {
+      return DataRow(
+        color: WidgetStatePropertyAll(AppColors.surface),
+        cells: [
+          DataCell(Text(label, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 11, color: AppColors.muted))),
+          for (final _ in days) const DataCell(SizedBox.shrink()),
+        ],
+      );
+    }
+
+    for (final s in parts.regular) {
+      rows.add(personRow(s));
+    }
+    if (parts.rotation.isNotEmpty) {
+      rows.add(spacerLabel('ROTATION'));
+      for (final s in parts.rotation) {
+        rows.add(personRow(s));
+      }
+    }
+    if (parts.leave.isNotEmpty) {
+      rows.add(DataRow(
+        cells: [
+          const DataCell(SizedBox(height: 8)),
+          for (final _ in days) const DataCell(SizedBox.shrink()),
+        ],
+      ));
+      rows.add(spacerLabel('ON LEAVE'));
+      for (final s in parts.leave) {
+        rows.add(personRow(s));
+      }
+    }
+    return rows;
   }
 
   Widget _cell(Map person, DateTime date, Map? assignment) {

@@ -75,3 +75,25 @@ bool leaveCovers(Map<String, dynamic> staff, DateTime date) {
   }
   return false;
 }
+
+/// Full-cycle leave (or employmentStatus On Leave) → bottom of roster / export.
+bool isOnLeaveForRoster(Map<String, dynamic> staff, dynamic startDate, dynamic endDate) {
+  if ((staff['employmentStatus'] ?? 'Active') == 'On Leave') return true;
+  final days = buildCycle(startDate, endDate);
+  if (days.isEmpty) return false;
+  return days.every((d) => leaveCovers(staff, d));
+}
+
+/// Duty staff first (regular then rotation), then leave — for calendars / exports.
+({List<Map<String, dynamic>> regular, List<Map<String, dynamic>> rotation, List<Map<String, dynamic>> leave})
+    partitionStaffForRoster(List staff, dynamic startDate, dynamic endDate) {
+  final maps = staff.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+  final leave = maps.where((s) => isOnLeaveForRoster(s, startDate, endDate)).toList();
+  final leaveIds = leave.map((s) => s['_id'].toString()).toSet();
+  final onDuty = maps.where((s) => !leaveIds.contains(s['_id'].toString())).toList();
+  return (
+    regular: onDuty.where((s) => s['isRotation'] != true).toList(),
+    rotation: onDuty.where((s) => s['isRotation'] == true).toList(),
+    leave: leave,
+  );
+}

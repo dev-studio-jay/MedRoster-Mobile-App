@@ -12,14 +12,14 @@ const ruleGroups = [
     ],
   ),
   (
-    title: 'Ghana guidelines (warnings only)',
+    title: 'Ghana guidelines (Flexible or Hardened)',
     items: [
-      'Prefer at least one senior or in-charge on Morning, Afternoon, and Night — missing coverage warns, never blocks.',
+      'Prefer at least one senior or in-charge on Morning, Afternoon, and Night.',
       'SOD counts toward day-side senior presence.',
       'Labour Act guideline: ~40h/week; hospital target defaults to 48h for Ghana practice.',
       'Labour Act §41: aim for ≥12h rest between shifts.',
       'Labour Act §42: aim for 48h contiguous rest in a 7-day window.',
-      'Shortages happen — generate and save still work without seniors.',
+      'At setup (or in settings) choose Flexible (warn only) or Hardened (enforce) for each guideline.',
     ],
   ),
   (
@@ -61,7 +61,7 @@ Future<void> showRulesSheet(BuildContext context) {
             Text('Rules', style: Theme.of(ctx).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800)),
             const SizedBox(height: 4),
             Text(
-              'Hard personal restrictions vs Ghana roster guidelines (warn only).',
+              'Hard personal restrictions vs Ghana guidelines you can set Flexible or Hardened at setup.',
               style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w500, fontSize: 13),
             ),
             const SizedBox(height: 16),

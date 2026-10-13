@@ -161,15 +161,20 @@ RosterExportModel buildRosterExportModel({
     return na.compareTo(nb);
   });
 
+  final parts = partitionStaffForRoster(staffMaps, schedule['startDate'], schedule['endDate']);
+  final ordered = [...parts.regular, ...parts.rotation, ...parts.leave];
+
   final staffRows = <Map<String, dynamic>>[];
-  for (var i = 0; i < staffMaps.length; i++) {
-    final s = staffMaps[i];
+  for (var i = 0; i < ordered.length; i++) {
+    final s = ordered[i];
+    final onLeave = parts.leave.any((l) => l['_id'].toString() == s['_id'].toString());
     staffRows.add({
       'no': i + 1,
       'name': '${s['firstName'] ?? ''} ${s['lastName'] ?? ''}'.trim(),
       'rank': getRankAbbr(s['rank']?.toString() ?? s['category']?.toString()),
       'cells': days.map((d) => cellFor(s, d)).toList(),
-      'isRotation': s['isRotation'] == true,
+      'isRotation': !onLeave && s['isRotation'] == true,
+      'isLeave': onLeave,
     });
   }
 
@@ -249,8 +254,13 @@ List<List<dynamic>> _buildAoa(RosterExportModel model) {
   final header = ['NO', 'NAME', 'RANK', ...model.dayHeaders];
   final rows = <List<dynamic>>[header];
   var rotationBanner = false;
+  var leaveBanner = false;
   for (final row in model.staffRows) {
-    if (row['isRotation'] == true && !rotationBanner) {
+    if (row['isLeave'] == true && !leaveBanner) {
+      rows.add([]); // blank spacer above leave block
+      rows.add(['', 'ON LEAVE', '', ...model.dayHeaders.map((_) => '')]);
+      leaveBanner = true;
+    } else if (row['isRotation'] == true && !rotationBanner && row['isLeave'] != true) {
       rows.add(['', 'ROTATION', '', ...model.dayHeaders.map((_) => '')]);
       rotationBanner = true;
     }
@@ -299,6 +309,25 @@ Future<void> shareRosterExcel(RosterExportModel model) async {
   await SharePlus.instance.share(ShareParams(files: [XFile(file.path)], text: model.title));
 }
 
+List<List<dynamic>> _pdfStaffTableRows(RosterExportModel model) {
+  final data = <List<dynamic>>[];
+  var rotationBanner = false;
+  var leaveBanner = false;
+  final blank = List<dynamic>.filled(model.dayHeaders.length + 3, '');
+  for (final row in model.staffRows) {
+    if (row['isLeave'] == true && !leaveBanner) {
+      data.add(blank);
+      data.add(['', 'ON LEAVE', '', ...model.dayHeaders.map((_) => '')]);
+      leaveBanner = true;
+    } else if (row['isRotation'] == true && !rotationBanner && row['isLeave'] != true) {
+      data.add(['', 'ROTATION', '', ...model.dayHeaders.map((_) => '')]);
+      rotationBanner = true;
+    }
+    data.add([row['no'], row['name'], row['rank'], ...(row['cells'] as List)]);
+  }
+  return data;
+}
+
 Future<void> shareRosterPdf(RosterExportModel model) async {
   final doc = pw.Document();
   doc.addPage(
@@ -314,10 +343,7 @@ Future<void> shareRosterPdf(RosterExportModel model) async {
         pw.SizedBox(height: 8),
         pw.TableHelper.fromTextArray(
           headers: ['NO', 'NAME', 'RANK', ...model.dayHeaders],
-          data: [
-            for (final row in model.staffRows)
-              [row['no'], row['name'], row['rank'], ...(row['cells'] as List)],
-          ],
+          data: _pdfStaffTableRows(model),
           headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 7),
           cellStyle: const pw.TextStyle(fontSize: 7),
           cellAlignments: {0: pw.Alignment.center, 2: pw.Alignment.center},

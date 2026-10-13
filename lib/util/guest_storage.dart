@@ -4,7 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 const _guestKey = 'medroster_guest_schedule';
 const _exportKey = 'medroster_guest_exports';
-const maxGuestExports = 5;
+const maxGuestExports = 10;
 
 Future<Map<String, dynamic>?> getGuestSchedule() async {
   final prefs = await SharedPreferences.getInstance();
